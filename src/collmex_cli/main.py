@@ -124,8 +124,52 @@ def create_vendor(
         if json_output:
             output_json({"status": "created", "response": result})
         else:
-            console.print(f"[green]Vendor created successfully[/green]")
+            console.print("[green]Vendor created successfully[/green]")
             console.print(f"Response: {result}")
+    except Exception as e:
+        handle_error(e)
+
+
+@app.command("vendor-match")
+def match_vendor(
+    iban: Annotated[str | None, typer.Option("--iban", help="IBAN to match")] = None,
+    vat_id: Annotated[str | None, typer.Option("--vat-id", help="VAT ID (USt-IdNr) to match")] = None,
+    name: Annotated[str | None, typer.Option("--name", "-n", help="Company name to match")] = None,
+    json_output: Annotated[bool, typer.Option("--json", "-j", help="Output as JSON")] = True,
+) -> None:
+    """Match a vendor by IBAN, VAT ID, or name.
+
+    Matching priority:
+    1. IBAN (exact match)
+    2. VAT ID (exact match)
+    3. Name (fuzzy match)
+
+    Returns match result with vendor_id if found.
+    """
+    if not any([iban, vat_id, name]):
+        err_console.print("[red]Error:[/red] At least one of --iban, --vat-id, or --name required")
+        raise typer.Exit(1)
+
+    try:
+        with CollmexClient() as client:
+            result = client.match_vendor(iban=iban, vat_id=vat_id, name=name)
+
+        if json_output:
+            output_json(result)
+        else:
+            match_type = result.get("match")
+            if match_type == "exact":
+                console.print(f"[green]Exact match found![/green]")
+                console.print(f"Match field: {result.get('match_field')}")
+                console.print(f"Vendor ID: {result.get('vendor_id')}")
+                vendor = result.get("vendor", {})
+                console.print(f"Name: {vendor.get('company_name', '')}")
+            elif match_type == "fuzzy":
+                console.print("[yellow]Fuzzy matches found:[/yellow]")
+                for c in result.get("candidates", []):
+                    console.print(f"  [{c['score']}] ID {c['vendor_id']}: {c['name']}")
+            else:
+                console.print("[red]No match found[/red]")
     except Exception as e:
         handle_error(e)
 
@@ -328,6 +372,131 @@ def create_vendor_invoice(
             console.print(f"Vendor: {vendor_id}")
             console.print(f"Invoice: {invoice_number}")
             console.print(f"Amount: {net_amount} EUR (net)")
+    except Exception as e:
+        handle_error(e)
+
+
+# =============================================================================
+# ZUGFeRD Commands
+# =============================================================================
+
+
+@app.command("invoice-send")
+def send_invoice(
+    pdf: Annotated[str, typer.Argument(help="Path to PDF file to send")],
+    xml: Annotated[str | None, typer.Option("--xml", "-x", help="Path to ZUGFeRD XML file (optional)")] = None,
+    recipient: Annotated[str | None, typer.Option("--to", help="Recipient email (defaults to COLLMEX_ACCOUNTING_EMAIL)")] = None,
+    subject: Annotated[str | None, typer.Option("--subject", "-s", help="Email subject")] = None,
+    body: Annotated[str | None, typer.Option("--body", "-b", help="Email body text")] = None,
+) -> None:
+    """Send vendor invoice PDF (with optional ZUGFeRD XML) to accounting.
+
+    The PDF will be sent to the configured accounting email address.
+    If a ZUGFeRD XML is provided, it will be attached for automatic import.
+
+    Requires SMTP configuration via environment variables:
+    - COLLMEX_SMTP_HOST, COLLMEX_SMTP_USER, COLLMEX_SMTP_PASSWORD, COLLMEX_SMTP_FROM
+    - COLLMEX_ACCOUNTING_EMAIL (optional, can override with --to)
+    """
+    from pathlib import Path
+
+    from .email import send_invoice_email
+
+    try:
+        # Read XML content if provided
+        xml_content = None
+        if xml:
+            xml_path = Path(xml)
+            if not xml_path.exists():
+                err_console.print(f"[red]XML file not found: {xml}[/red]")
+                raise typer.Exit(1)
+            xml_content = xml_path.read_text(encoding="utf-8")
+
+        send_invoice_email(
+            pdf_path=pdf,
+            xml_content=xml_content,
+            recipient=recipient,
+            subject=subject,
+            body=body,
+        )
+
+        console.print(f"[green]Invoice sent successfully![/green]")
+        if recipient:
+            console.print(f"Recipient: {recipient}")
+        else:
+            console.print("Recipient: (from COLLMEX_ACCOUNTING_EMAIL)")
+        console.print(f"PDF: {pdf}")
+        if xml:
+            console.print(f"XML: {xml}")
+
+    except Exception as e:
+        handle_error(e)
+
+
+@app.command("zugferd-create")
+def create_zugferd(
+    vendor_id: Annotated[int, typer.Option("--vendor-id", "-v", help="Vendor ID from Collmex")],
+    invoice_number: Annotated[str, typer.Option("--invoice", "-i", help="Invoice number")],
+    invoice_date: Annotated[str, typer.Option("--date", "-d", help="Invoice date (YYYY-MM-DD)")],
+    description: Annotated[str, typer.Option("--desc", help="Line item description")],
+    net_amount: Annotated[float, typer.Option("--net", "-n", help="Net amount")],
+    tax_rate: Annotated[float, typer.Option("--tax-rate", help="Tax rate (e.g., 19.0)")] = 19.0,
+    quantity: Annotated[float, typer.Option("--qty", help="Quantity")] = 1.0,
+    output: Annotated[str | None, typer.Option("--output", "-o", help="Output file path")] = None,
+    buyer_id: Annotated[str | None, typer.Option("--buyer-id", help="Your customer ID at the vendor")] = None,
+    due_date: Annotated[str | None, typer.Option("--due", help="Payment due date (YYYY-MM-DD)")] = None,
+    notes: Annotated[str | None, typer.Option("--notes", help="Additional notes")] = None,
+) -> None:
+    """Generate a ZUGFeRD XML for a vendor invoice.
+
+    Fetches vendor data from Collmex and generates an EN 16931 compliant XML.
+    Buyer data is taken from COLLMEX_BUYER_* environment variables.
+    """
+    from .zugferd import create_zugferd_xml, save_zugferd_xml
+
+    try:
+        inv_date = date.fromisoformat(invoice_date)
+        payment_due = date.fromisoformat(due_date) if due_date else None
+
+        # Fetch vendor from Collmex
+        with CollmexClient() as client:
+            vendors = client.get_vendors(vendor_id=vendor_id)
+
+        if not vendors:
+            err_console.print(f"[red]Vendor {vendor_id} not found[/red]")
+            raise typer.Exit(1)
+
+        vendor = vendors[0]
+
+        # Create line items
+        line_items = [
+            {
+                "description": description,
+                "quantity": Decimal(str(quantity)),
+                "unit_price": Decimal(str(net_amount)) / Decimal(str(quantity)),
+                "tax_rate": Decimal(str(tax_rate)),
+                "unit": "C62",  # pieces
+            }
+        ]
+
+        # Generate XML
+        xml_content = create_zugferd_xml(
+            vendor=vendor,
+            invoice_number=invoice_number,
+            invoice_date=inv_date,
+            line_items=line_items,
+            buyer_customer_id=buyer_id,
+            due_date=payment_due,
+            notes=notes,
+        )
+
+        # Output
+        if output:
+            save_zugferd_xml(xml_content, output)
+            console.print(f"[green]ZUGFeRD XML saved to {output}[/green]")
+        else:
+            print(xml_content)
+
     except Exception as e:
         handle_error(e)
 

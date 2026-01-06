@@ -80,6 +80,113 @@ class CollmexClient:
         """
         return self.api.request(vendor.to_csv_row())
 
+    def match_vendor(
+        self,
+        iban: str | None = None,
+        vat_id: str | None = None,
+        name: str | None = None,
+    ) -> dict:
+        """Match a vendor by IBAN, VAT ID, or name.
+
+        Matching priority:
+        1. IBAN (exact match) - 100% confidence
+        2. VAT ID (exact match) - 100% confidence
+        3. Name (fuzzy match) - returns candidates
+
+        Args:
+            iban: IBAN to search for
+            vat_id: VAT ID (USt-IdNr) to search for
+            name: Company name to search for
+
+        Returns:
+            Dict with match result:
+            - {"match": "exact", "vendor_id": 123, "vendor": {...}}
+            - {"match": "fuzzy", "candidates": [...]}
+            - {"match": "none"}
+        """
+        vendors = self.get_vendors()
+
+        # 1. Try IBAN match (exact)
+        if iban:
+            iban_clean = iban.replace(" ", "").upper()
+            for v in vendors:
+                if v.iban and v.iban.replace(" ", "").upper() == iban_clean:
+                    return {
+                        "match": "exact",
+                        "match_field": "iban",
+                        "vendor_id": v.vendor_id,
+                        "vendor": v.model_dump(),
+                    }
+
+        # 2. Try VAT ID match (exact)
+        if vat_id:
+            vat_clean = vat_id.replace(" ", "").upper()
+            for v in vendors:
+                if v.vat_id and v.vat_id.replace(" ", "").upper() == vat_clean:
+                    return {
+                        "match": "exact",
+                        "match_field": "vat_id",
+                        "vendor_id": v.vendor_id,
+                        "vendor": v.model_dump(),
+                    }
+
+        # 3. Try name match (fuzzy)
+        if name:
+            name_lower = name.lower()
+            candidates = []
+            for v in vendors:
+                vendor_name = v.company_name or f"{v.first_name} {v.last_name}".strip()
+                if not vendor_name:
+                    continue
+                vendor_name_lower = vendor_name.lower()
+
+                # Calculate simple similarity score
+                score = self._fuzzy_score(name_lower, vendor_name_lower)
+                if score > 0.4:  # Threshold for consideration
+                    candidates.append({
+                        "vendor_id": v.vendor_id,
+                        "name": vendor_name,
+                        "score": round(score, 2),
+                        "vendor": v.model_dump(),
+                    })
+
+            if candidates:
+                # Sort by score descending
+                candidates.sort(key=lambda x: x["score"], reverse=True)
+                # If top match is very good, return as exact
+                if candidates[0]["score"] > 0.9:
+                    return {
+                        "match": "exact",
+                        "match_field": "name",
+                        "vendor_id": candidates[0]["vendor_id"],
+                        "vendor": candidates[0]["vendor"],
+                    }
+                return {
+                    "match": "fuzzy",
+                    "candidates": candidates[:5],  # Top 5
+                }
+
+        return {"match": "none"}
+
+    def _fuzzy_score(self, s1: str, s2: str) -> float:
+        """Calculate fuzzy match score between two strings.
+
+        Uses a simple approach: longest common subsequence ratio.
+        """
+        # Check for substring match first
+        if s1 in s2 or s2 in s1:
+            return 0.95
+
+        # Simple token overlap
+        tokens1 = set(s1.split())
+        tokens2 = set(s2.split())
+        if not tokens1 or not tokens2:
+            return 0.0
+
+        intersection = tokens1 & tokens2
+        union = tokens1 | tokens2
+        return len(intersection) / len(union)
+
     # =========================================================================
     # Vendor Invoices (Lieferantenrechnungen)
     # =========================================================================

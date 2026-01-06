@@ -10,6 +10,7 @@ dependencies = [
     "rich>=13.0.0",
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",
+    "drafthorse>=2.4.0",
 ]
 
 [project.scripts]
