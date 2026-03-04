@@ -48,3 +48,7 @@ htmlcov/
 # OS
 .DS_Store
 Thumbs.db
+
+# Dolt database files (added by bd init)
+.dolt/
+*.db
