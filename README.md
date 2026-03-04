@@ -5,6 +5,10 @@ LLM-friendly CLI wrapper for the [Collmex](https://www.collmex.de) accounting AP
 ## Installation
 
 ```bash
+# From PyPI (recommended)
+uv tool install collmex-cli
+
+# From source (development)
 uv pip install -e .
 ```
 

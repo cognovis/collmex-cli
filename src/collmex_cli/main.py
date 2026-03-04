@@ -13,8 +13,32 @@ from rich.table import Table
 
 from . import __version__
 from .api import CollmexAuthError, CollmexError
+from .app_config import load_config
 from .client import CollmexClient
 from .models import Vendor, VendorInvoice
+
+
+def check_for_update() -> None:
+    """Check PyPI for a newer version and print a hint if available."""
+    import re
+
+    import httpx
+
+    def _normalize(v: str) -> tuple[int, ...]:
+        return tuple(int(x) for x in re.sub(r"[^0-9.]", "", v).split(".") if x)
+
+    try:
+        resp = httpx.get("https://pypi.org/pypi/collmex-cli/json", timeout=3)
+        if resp.status_code != 200:
+            return
+        latest = resp.json()["info"]["version"]
+        if _normalize(latest) > _normalize(__version__):
+            Console(stderr=True).print(
+                f"[dim]Update available: {__version__} → {latest}  "
+                f"(uv tool upgrade collmex-cli)[/dim]"
+            )
+    except Exception:
+        pass
 
 app = typer.Typer(
     name="collmex",
@@ -278,6 +302,71 @@ def list_bookings(
         handle_error(e)
 
 
+@app.command("bank-status")
+def bank_status(
+    account: Annotated[int | None, typer.Option("--account", "-a", help="Single bank account number (default: all from config)")] = None,
+    year: Annotated[int | None, typer.Option("--year", "-y", help="Fiscal year")] = None,
+    json_output: Annotated[bool, typer.Option("--json", "-j", help="Output as JSON")] = False,
+) -> None:
+    """Show the date of the last bank statement import.
+
+    Without --account, queries all bank accounts defined in
+    ~/.config/collmex-cli/config.toml.
+
+    Useful to know the start date for exporting new statements from MoneyMoney.
+    """
+    from .app_config import config_path
+
+    try:
+        cfg = load_config()
+
+        # Single account or all configured accounts
+        if account is not None:
+            accounts = {"Account": account}
+        elif cfg.bank_accounts:
+            accounts = cfg.bank_accounts
+        else:
+            err_console.print(f"[red]No bank accounts configured.[/red]")
+            err_console.print(f"Either use [bold]--account 1200[/bold] or configure accounts in:")
+            err_console.print(f"  [dim]{config_path()}[/dim]")
+            err_console.print()
+            err_console.print("[dim]Example config.toml:[/dim]")
+            err_console.print('[dim][bank_accounts][/dim]')
+            err_console.print('[dim]"Geschaeftskonto" = 1200[/dim]')
+            raise typer.Exit(1)
+
+        results = []
+        with CollmexClient() as client:
+            for name, acct_nr in accounts.items():
+                result = client.get_last_bank_booking_date(
+                    bank_account=acct_nr,
+                    fiscal_year=year,
+                )
+                result["name"] = name
+                results.append(result)
+
+        if json_output:
+            output_json(results if len(results) > 1 else results[0])
+        else:
+            table = Table(title=f"Bank Status (fiscal year {results[0]['fiscal_year']})")
+            table.add_column("Account")
+            table.add_column("Number", justify="right")
+            table.add_column("Last Booking", justify="center")
+            table.add_column("Bookings", justify="right")
+            for r in results:
+                last = str(r["last_date"]) if r["last_date"] else "[yellow]none[/yellow]"
+                table.add_row(r["name"], str(r["account"]), last, str(r["booking_count"]))
+            console.print(table)
+
+            # Show the overall earliest "last_date" as suggested MoneyMoney export start
+            dates = [r["last_date"] for r in results if r["last_date"]]
+            if dates:
+                earliest = min(dates)
+                console.print(f"\n[dim]Export from MoneyMoney starting: {earliest}[/dim]")
+    except Exception as e:
+        handle_error(e)
+
+
 @app.command("unmatched")
 def list_unmatched(
     account: Annotated[int, typer.Option("--account", "-a", help="Bank account number")] = 1200,
@@ -519,8 +608,9 @@ def test_connection() -> None:
         handle_error(e)
 
 
-@app.callback()
+@app.callback(invoke_without_command=True)
 def main(
+    ctx: typer.Context,
     version: Annotated[
         bool, typer.Option("--version", "-V", help="Show version and exit")
     ] = False,
@@ -529,6 +619,10 @@ def main(
     if version:
         console.print(f"collmex-cli {__version__}")
         raise typer.Exit()
+    if ctx.invoked_subcommand is None:
+        console.print(ctx.get_help())
+        raise typer.Exit()
+    check_for_update()
 
 
 if __name__ == "__main__":

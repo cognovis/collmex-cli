@@ -291,6 +291,49 @@ class CollmexClient:
         results = self.api.request(row)
         return [AccountingDocument.from_csv_row(r) for r in results if r and r[0] == "ACCDOC"]
 
+    def get_last_bank_booking_date(
+        self,
+        bank_account: int = 1200,
+        fiscal_year: int | None = None,
+    ) -> dict:
+        """Get the date of the last booking on a bank account.
+
+        This indicates the last imported bank statement date.
+
+        Args:
+            bank_account: Bank account number (default: 1200)
+            fiscal_year: Filter by fiscal year (default: current year)
+
+        Returns:
+            Dict with last_date, booking_count, and account info
+        """
+        if fiscal_year is None:
+            fiscal_year = date.today().year
+
+        bookings = self.get_bookings(
+            fiscal_year=fiscal_year,
+            account_number=bank_account,
+        )
+
+        if not bookings:
+            return {
+                "account": bank_account,
+                "fiscal_year": fiscal_year,
+                "last_date": None,
+                "booking_count": 0,
+            }
+
+        # Find the latest document_date
+        dates = [b.document_date for b in bookings if b.document_date]
+        last_date = max(dates) if dates else None
+
+        return {
+            "account": bank_account,
+            "fiscal_year": fiscal_year,
+            "last_date": last_date,
+            "booking_count": len(bookings),
+        }
+
     def get_unmatched_bank_transactions(
         self,
         bank_account: int = 1200,
