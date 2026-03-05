@@ -20,6 +20,9 @@ from .models import AccountBalance, Customer, Invoice, InvoicePayment, Vendor, V
 
 def check_for_update() -> None:
     """Check PyPI for a newer version and print a hint if available."""
+    if ".dev" in __version__:
+        return
+
     import re
 
     import httpx
