@@ -6,6 +6,7 @@ from .api import CollmexAPI
 from .config import CollmexConfig
 from .models import (
     AccountingDocument,
+    Invoice,
     OpenItem,
     Vendor,
     VendorInvoice,
@@ -333,6 +334,46 @@ class CollmexClient:
             "last_date": last_date,
             "booking_count": len(bookings),
         }
+
+    # =========================================================================
+    # Customer Invoices (Kundenrechnungen)
+    # =========================================================================
+
+    def get_invoices(
+        self,
+        invoice_id: int | None = None,
+        customer_id: int | None = None,
+        date_from: date | None = None,
+        date_to: date | None = None,
+        invoice_type: int | None = None,
+        only_changed: bool = False,
+    ) -> list[Invoice]:
+        """Get customer invoices from Collmex.
+
+        Args:
+            invoice_id: Filter by specific invoice ID
+            customer_id: Filter by customer ID
+            date_from: Start date filter
+            date_to: End date filter
+            invoice_type: 0=Rechnung, 1=Gutschrift, 2=Lieferschein
+            only_changed: Only return changed records since last query
+
+        Returns:
+            List of Invoice objects (grouped from CMXINV rows)
+        """
+        row = ["INVOICE_GET"]
+        row.append(str(self.api.config.company_id))
+        row.append(str(invoice_id) if invoice_id else "")
+        row.append(str(customer_id) if customer_id else "")
+        row.append(format_collmex_date(date_from) if date_from else "")
+        row.append(format_collmex_date(date_to) if date_to else "")
+        row.append(str(invoice_type) if invoice_type is not None else "")
+        row.append("1" if only_changed else "")
+        row.append("")  # system name
+
+        results = self.api.request(row)
+        cmxinv_rows = [r for r in results if r and r[0] == "CMXINV"]
+        return Invoice.from_cmxinv_rows(cmxinv_rows)
 
     def get_unmatched_bank_transactions(
         self,

@@ -15,7 +15,7 @@ from . import __version__
 from .api import CollmexAuthError, CollmexError
 from .app_config import load_config
 from .client import CollmexClient
-from .models import Vendor, VendorInvoice
+from .models import Invoice, Vendor, VendorInvoice
 
 
 def check_for_update() -> None:
@@ -298,6 +298,56 @@ def list_bookings(
                 rows,
             )
             console.print(f"\n[dim]Total: {len(bookings)} bookings[/dim]")
+    except Exception as e:
+        handle_error(e)
+
+
+# =============================================================================
+# Invoices Commands
+# =============================================================================
+
+
+@app.command("invoices")
+def list_invoices(
+    invoice_id: Annotated[int | None, typer.Option("--invoice-id", help="Filter by invoice ID")] = None,
+    customer_id: Annotated[int | None, typer.Option("--customer-id", help="Filter by customer ID")] = None,
+    date_from: Annotated[str | None, typer.Option("--from", help="Start date (YYYY-MM-DD)")] = None,
+    date_to: Annotated[str | None, typer.Option("--to", help="End date (YYYY-MM-DD)")] = None,
+    json_output: Annotated[bool, typer.Option("--json", "-j", help="Output as JSON")] = False,
+) -> None:
+    """List customer invoices (Kundenrechnungen)."""
+    try:
+        from_date = date.fromisoformat(date_from) if date_from else None
+        to_date = date.fromisoformat(date_to) if date_to else None
+
+        with CollmexClient() as client:
+            invoices = client.get_invoices(
+                invoice_id=invoice_id,
+                customer_id=customer_id,
+                date_from=from_date,
+                date_to=to_date,
+            )
+
+        if json_output:
+            output_json([inv.model_dump() for inv in invoices])
+        else:
+            rows = [
+                [
+                    inv.invoice_number_text or str(inv.invoice_id),
+                    inv.invoice_date,
+                    inv.customer_company or f"{inv.customer_first_name} {inv.customer_last_name}".strip(),
+                    inv.total_net,
+                    inv.total_gross,
+                    inv.currency,
+                ]
+                for inv in invoices
+            ]
+            output_table(
+                "Invoices",
+                ["Invoice#", "Date", "Customer", "Total Net", "Total Gross", "Currency"],
+                rows,
+            )
+            console.print(f"\n[dim]Total: {len(invoices)} invoices[/dim]")
     except Exception as e:
         handle_error(e)
 
