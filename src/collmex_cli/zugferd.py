@@ -18,6 +18,29 @@ from .config import CollmexConfig, get_config
 from .models import Vendor
 
 
+def validate_vendor_for_zugferd(vendor: Vendor) -> list[str]:
+    """Validate that a vendor has all required fields for ZUGFeRD XML generation.
+
+    Checks: street, postal_code, city, and vat_id OR tax_id (at least one).
+
+    Args:
+        vendor: Vendor to validate
+
+    Returns:
+        List of missing field names (empty list if all required fields are present)
+    """
+    missing = []
+    if not vendor.street:
+        missing.append("street")
+    if not vendor.postal_code:
+        missing.append("postal_code")
+    if not vendor.city:
+        missing.append("city")
+    if not vendor.vat_id and not vendor.tax_id:
+        missing.append("vat_id")
+    return missing
+
+
 def create_zugferd_xml(
     vendor: Vendor,
     invoice_number: str,

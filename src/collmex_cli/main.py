@@ -198,6 +198,83 @@ def match_vendor(
         handle_error(e)
 
 
+@app.command("vendor-update")
+def update_vendor(
+    vendor_id: Annotated[int, typer.Option("--vendor-id", "-v", help="Vendor ID to update")],
+    name: Annotated[str | None, typer.Option("--name", help="Company name")] = None,
+    street: Annotated[str | None, typer.Option("--street", help="Street address")] = None,
+    postal_code: Annotated[str | None, typer.Option("--postal-code", help="Postal code")] = None,
+    city: Annotated[str | None, typer.Option("--city", help="City")] = None,
+    vat_id: Annotated[str | None, typer.Option("--vat-id", help="VAT ID (USt-IdNr)")] = None,
+    tax_id: Annotated[str | None, typer.Option("--tax-id", help="Tax ID (Steuernummer)")] = None,
+    iban: Annotated[str | None, typer.Option("--iban", help="IBAN")] = None,
+    bic: Annotated[str | None, typer.Option("--bic", help="BIC/SWIFT code")] = None,
+    email: Annotated[str | None, typer.Option("--email", help="Email address")] = None,
+    phone: Annotated[str | None, typer.Option("--phone", help="Phone number")] = None,
+    json_output: Annotated[bool, typer.Option("--json", "-j", help="Output as JSON")] = False,
+) -> None:
+    """Update an existing vendor (Lieferant).
+
+    Fetches current vendor data, applies the specified field updates, and saves
+    back to Collmex. Warns if a previously filled field is being overwritten.
+    """
+    # Collect only the fields that were provided
+    updates: dict = {}
+    if name is not None:
+        updates["company_name"] = name
+    if street is not None:
+        updates["street"] = street
+    if postal_code is not None:
+        updates["postal_code"] = postal_code
+    if city is not None:
+        updates["city"] = city
+    if vat_id is not None:
+        updates["vat_id"] = vat_id
+    if tax_id is not None:
+        updates["tax_id"] = tax_id
+    if iban is not None:
+        updates["iban"] = iban
+    if bic is not None:
+        updates["bic"] = bic
+    if email is not None:
+        updates["email"] = email
+    if phone is not None:
+        updates["phone"] = phone
+
+    if not updates:
+        err_console.print("[red]Error:[/red] No fields to update. Specify at least one field option.")
+        raise typer.Exit(1)
+
+    try:
+        with CollmexClient() as client:
+            # Fetch current vendor to detect overwrites
+            existing = client.get_vendors(vendor_id=vendor_id)
+            if existing:
+                current = existing[0]
+                # Warn when overwriting non-empty critical fields
+                for field in ("company_name", "street", "postal_code", "city"):
+                    if field in updates:
+                        current_val = getattr(current, field, "")
+                        new_val = updates[field]
+                        if current_val and current_val != new_val:
+                            err_console.print(
+                                f"[yellow]Warning:[/yellow] Overwriting {field}: "
+                                f"'{current_val}' -> '{new_val}'"
+                            )
+
+            updated = client.update_vendor(vendor_id=vendor_id, **updates)
+
+        if json_output:
+            output_json(updated.model_dump())
+        else:
+            console.print(f"[green]Vendor {vendor_id} updated successfully[/green]")
+            console.print(f"Name: {updated.company_name}")
+            console.print(f"Street: {updated.street}")
+            console.print(f"City: {updated.city}")
+    except Exception as e:
+        handle_error(e)
+
+
 # =============================================================================
 # Customer Commands
 # =============================================================================
@@ -766,13 +843,15 @@ def create_zugferd(
     buyer_id: Annotated[str | None, typer.Option("--buyer-id", help="Your customer ID at the vendor")] = None,
     due_date: Annotated[str | None, typer.Option("--due", help="Payment due date (YYYY-MM-DD)")] = None,
     notes: Annotated[str | None, typer.Option("--notes", help="Additional notes")] = None,
+    force: Annotated[bool, typer.Option("--force", help="Skip seller data validation")] = False,
 ) -> None:
     """Generate a ZUGFeRD XML for a vendor invoice.
 
     Fetches vendor data from Collmex and generates an EN 16931 compliant XML.
     Buyer data is taken from COLLMEX_BUYER_* environment variables.
+    Validates seller (vendor) data before generation; use --force to skip.
     """
-    from .zugferd import create_zugferd_xml, save_zugferd_xml
+    from .zugferd import create_zugferd_xml, save_zugferd_xml, validate_vendor_for_zugferd
 
     try:
         inv_date = date.fromisoformat(invoice_date)
@@ -787,6 +866,17 @@ def create_zugferd(
             raise typer.Exit(1)
 
         vendor = vendors[0]
+
+        # Validate seller data unless --force is set
+        if not force:
+            missing = validate_vendor_for_zugferd(vendor)
+            if missing:
+                err_console.print(
+                    f"[red]Error:[/red] Vendor {vendor_id} is missing required fields for ZUGFeRD: "
+                    + ", ".join(missing)
+                )
+                err_console.print("[dim]Use --force to skip validation.[/dim]")
+                raise typer.Exit(1)
 
         # Create line items
         line_items = [

@@ -17,6 +17,25 @@ from .models import (
 )
 
 
+def _vendor_missing_fields(vendor: "Vendor") -> list[str]:
+    """Return list of missing required vendor fields.
+
+    Checks: street, postal_code, city, iban, and vat_id OR tax_id (at least one).
+    """
+    missing = []
+    if not vendor.street:
+        missing.append("street")
+    if not vendor.postal_code:
+        missing.append("postal_code")
+    if not vendor.city:
+        missing.append("city")
+    if not vendor.iban:
+        missing.append("iban")
+    if not vendor.vat_id and not vendor.tax_id:
+        missing.append("vat_id")
+    return missing
+
+
 class CollmexClient:
     """High-level client for Collmex API operations.
 
@@ -84,6 +103,33 @@ class CollmexClient:
         """
         return self.api.request(vendor.to_csv_row())
 
+    def update_vendor(self, vendor_id: int, **fields) -> "Vendor":
+        """Update an existing vendor's fields.
+
+        Fetches the current vendor, applies the given field updates, and saves
+        via create_vendor (CMXLIF). Returns the updated Vendor object.
+
+        Args:
+            vendor_id: ID of the vendor to update
+            **fields: Field name/value pairs to update (e.g. street="Neue Str. 1")
+
+        Returns:
+            Updated Vendor object
+
+        Raises:
+            ValueError: If the vendor is not found
+        """
+        vendors = self.get_vendors(vendor_id=vendor_id)
+        if not vendors:
+            raise ValueError(f"Vendor {vendor_id} not found")
+
+        vendor = vendors[0]
+        for field, value in fields.items():
+            setattr(vendor, field, value)
+
+        self.create_vendor(vendor)
+        return vendor
+
     def match_vendor(
         self,
         iban: str | None = None,
@@ -120,6 +166,7 @@ class CollmexClient:
                         "match_field": "iban",
                         "vendor_id": v.vendor_id,
                         "vendor": v.model_dump(),
+                        "missing_fields": _vendor_missing_fields(v),
                     }
 
         # 2. Try VAT ID match (exact)
@@ -132,6 +179,7 @@ class CollmexClient:
                         "match_field": "vat_id",
                         "vendor_id": v.vendor_id,
                         "vendor": v.model_dump(),
+                        "missing_fields": _vendor_missing_fields(v),
                     }
 
         # 3. Try name match (fuzzy)
@@ -152,6 +200,7 @@ class CollmexClient:
                         "name": vendor_name,
                         "score": round(score, 2),
                         "vendor": v.model_dump(),
+                        "missing_fields": _vendor_missing_fields(v),
                     })
 
             if candidates:
@@ -164,6 +213,7 @@ class CollmexClient:
                         "match_field": "name",
                         "vendor_id": candidates[0]["vendor_id"],
                         "vendor": candidates[0]["vendor"],
+                        "missing_fields": candidates[0]["missing_fields"],
                     }
                 return {
                     "match": "fuzzy",
