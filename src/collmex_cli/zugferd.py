@@ -109,7 +109,7 @@ def create_zugferd_xml(
 
     if vendor.vat_id:
         tax_reg = TaxRegistration()
-        tax_reg.id = (vendor.vat_id, "VA")
+        tax_reg.id = ("VA", vendor.vat_id)
         doc.trade.agreement.seller.tax_registrations.add(tax_reg)
 
     # Buyer (your company) party
@@ -128,6 +128,11 @@ def create_zugferd_xml(
 
     if config.buyer_email:
         doc.trade.agreement.buyer.electronic_address.uri_ID = (config.buyer_email, "EM")
+
+    if config.buyer_vat_id:
+        buyer_tax_reg = TaxRegistration()
+        buyer_tax_reg.id = ("VA", config.buyer_vat_id)
+        doc.trade.agreement.buyer.tax_registrations.add(buyer_tax_reg)
 
     # Line items
     total_net = Decimal("0.00")
