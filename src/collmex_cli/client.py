@@ -342,17 +342,24 @@ class CollmexClient:
     def get_invoice_payments(
         self,
         invoice_number: str | None = None,
-        customer_id: int | None = None,
-        date_from: date | None = None,
-        date_to: date | None = None,
+        only_new: bool = False,
+        system_name: str | None = None,
     ) -> list[InvoicePayment]:
         """Get invoice payments from Collmex.
 
+        Only works for invoices imported via CMXUMS (external invoices),
+        not for invoices created directly in Collmex.
+
+        Official query fields (INVOICE_PAYMENT_GET):
+          2: Firma Nr
+          3: Rechnungsnummer — optional, filter by invoice number
+          4: Nur neue Zahlungen — 1 = only new since last query
+          5: Systemname — external system name (tracks last query time)
+
         Args:
-            invoice_number: Filter by invoice number
-            customer_id: Filter by customer ID
-            date_from: Start date filter (payment date)
-            date_to: End date filter (payment date)
+            invoice_number: Filter by invoice number (optional)
+            only_new: If True, return only payments new since last query for system_name
+            system_name: External system name (used with only_new for change tracking)
 
         Returns:
             List of InvoicePayment objects
@@ -360,9 +367,8 @@ class CollmexClient:
         row = ["INVOICE_PAYMENT_GET"]
         row.append(str(self.api.config.company_id))
         row.append(invoice_number or "")
-        row.append(str(customer_id) if customer_id else "")
-        row.append(format_collmex_date(date_from) if date_from else "")
-        row.append(format_collmex_date(date_to) if date_to else "")
+        row.append("1" if only_new else "")
+        row.append(system_name or "")
 
         results = self.api.request(row)
         return [

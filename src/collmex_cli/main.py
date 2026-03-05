@@ -310,22 +310,21 @@ def list_bookings(
 @app.command("invoice-payments")
 def list_invoice_payments(
     invoice_number: Annotated[str | None, typer.Option("--invoice-number", "-i", help="Filter by invoice number")] = None,
-    customer_id: Annotated[int | None, typer.Option("--customer-id", "-c", help="Filter by customer ID")] = None,
-    date_from: Annotated[str | None, typer.Option("--date-from", help="Payment date from (YYYY-MM-DD)")] = None,
-    date_to: Annotated[str | None, typer.Option("--date-to", help="Payment date to (YYYY-MM-DD)")] = None,
+    only_new: Annotated[bool, typer.Option("--only-new", help="Only return new payments since last query")] = False,
+    system_name: Annotated[str | None, typer.Option("--system", help="System name for change tracking")] = None,
     json_output: Annotated[bool, typer.Option("--json", "-j", help="Output as JSON")] = False,
 ) -> None:
-    """List invoice payments (Rechnungszahlungen)."""
-    try:
-        from_date = date.fromisoformat(date_from) if date_from else None
-        to_date = date.fromisoformat(date_to) if date_to else None
+    """List invoice payments (Rechnungszahlungen).
 
+    Only works for invoices imported via CMXUMS (external invoices).
+    Filter by invoice number, or use --only-new to fetch only new payments since last query.
+    """
+    try:
         with CollmexClient() as client:
             payments = client.get_invoice_payments(
                 invoice_number=invoice_number,
-                customer_id=customer_id,
-                date_from=from_date,
-                date_to=to_date,
+                only_new=only_new,
+                system_name=system_name,
             )
 
         if json_output:
@@ -336,15 +335,16 @@ def list_invoice_payments(
                     p.invoice_number,
                     p.payment_date,
                     p.payment_amount,
-                    p.invoice_amount,
+                    p.reducing_amount,
                     p.fiscal_year,
                     p.booking_id,
+                    p.booking_position,
                 ]
                 for p in payments
             ]
             output_table(
                 "Invoice Payments",
-                ["Invoice #", "Date", "Paid", "Invoice Total", "Year", "Booking ID"],
+                ["Invoice #", "Date", "Paid", "Reduces OP by", "Year", "Booking", "Pos"],
                 rows,
             )
             console.print(f"\n[dim]Total: {len(payments)} payments[/dim]")

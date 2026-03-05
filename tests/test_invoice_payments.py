@@ -6,23 +6,32 @@ Covers:
 - Filter parameters
 - CLI command 'invoice-payments'
 
-Real API response layout (verified against live Collmex API):
-  0: INVOICE_PAYMENT
-  1: invoice_number
-  2: payment_date (YYYYMMDD)
-  3: payment_amount (German decimal, e.g. "195,05")
-  4: invoice_amount (total invoice amount)
-  5: fiscal_year
-  6: booking_id
-  7: payment_type code
-  8: (unused / empty)
+Official API field layout (source: https://www.collmex.de/handbuch_buchhaltung_pro.html#api):
+  1: Satzart           — INVOICE_PAYMENT
+  2: Rechnungsnummer   — Invoice number
+  3: Datum             — Payment date (YYYYMMDD)
+  4: Gezahlter Betrag  — Actually paid via bank/cash
+  5: Reduzierender Betrag — Open item reduced by this amount (may differ: Skonto etc.)
+  6: Geschäftsjahr     — Fiscal year of the booking
+  7: BuchungNr         — Booking number
+  8: BuchungPos        — Booking position
+  9: Systemname        — External system name
+
+Key: Geschäftsjahr + BuchungNr + BuchungPos uniquely identify a payment.
+When a payment is reversed, Datum and Betrag are empty.
+
+Query fields (INVOICE_PAYMENT_GET):
+  2: Firma Nr
+  3: Rechnungsnummer (optional)
+  4: Nur neue Zahlungen (1 = only new)
+  5: Systemname
+  No customer_id filter exists in this API.
 """
 
 from datetime import date
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
-import pytest
 from typer.testing import CliRunner
 
 from collmex_cli.client import CollmexClient
@@ -41,22 +50,23 @@ def _make_payment_row(
     invoice_number: str = "RE-2026-001",
     payment_date: str = "20260115",
     payment_amount: str = "1190,00",
-    invoice_amount: str = "1190,00",
+    reducing_amount: str = "1190,00",
     fiscal_year: str = "2026",
     booking_id: str = "5001",
-    payment_type: str = "2",
+    booking_position: str = "2",
+    system_name: str = "",
 ) -> list[str]:
-    """Build a raw CSV row as returned by the real Collmex API."""
+    """Build a raw CSV row matching the official Collmex INVOICE_PAYMENT spec."""
     return [
-        "INVOICE_PAYMENT",
-        invoice_number,
-        payment_date,
-        payment_amount,
-        invoice_amount,
-        fiscal_year,
-        booking_id,
-        payment_type,
-        "",
+        "INVOICE_PAYMENT",  # [0] Satzart
+        invoice_number,     # [1] Rechnungsnummer
+        payment_date,       # [2] Datum
+        payment_amount,     # [3] Gezahlter Betrag
+        reducing_amount,    # [4] Reduzierender Betrag
+        fiscal_year,        # [5] Geschäftsjahr
+        booking_id,         # [6] BuchungNr
+        booking_position,   # [7] BuchungPos
+        system_name,        # [8] Systemname
     ]
 
 
@@ -67,10 +77,11 @@ def _make_payment(**kwargs) -> InvoicePayment:
         invoice_number="RE-2026-001",
         payment_date=date(2026, 1, 15),
         payment_amount=Decimal("1190.00"),
-        invoice_amount=Decimal("1190.00"),
+        reducing_amount=Decimal("1190.00"),
         fiscal_year=2026,
         booking_id=5001,
-        payment_type="2",
+        booking_position=2,
+        system_name="",
     )
     defaults.update(kwargs)
     return InvoicePayment(**defaults)
@@ -85,7 +96,7 @@ class TestInvoicePaymentModel:
     """Tests for the InvoicePayment Pydantic model."""
 
     def test_from_csv_row_basic(self):
-        """from_csv_row parses all fields correctly."""
+        """from_csv_row parses all fields per official API spec."""
         row = _make_payment_row()
         payment = InvoicePayment.from_csv_row(row)
 
@@ -93,48 +104,50 @@ class TestInvoicePaymentModel:
         assert payment.invoice_number == "RE-2026-001"
         assert payment.payment_date == date(2026, 1, 15)
         assert payment.payment_amount == Decimal("1190.00")
-        assert payment.invoice_amount == Decimal("1190.00")
+        assert payment.reducing_amount == Decimal("1190.00")
         assert payment.fiscal_year == 2026
         assert payment.booking_id == 5001
-        assert payment.payment_type == "2"
+        assert payment.booking_position == 2
+        assert payment.system_name == ""
 
     def test_from_csv_row_german_decimal(self):
         """German comma decimal separator is parsed correctly."""
-        row = _make_payment_row(payment_amount="2499,99", invoice_amount="2499,99")
+        row = _make_payment_row(payment_amount="2499,99", reducing_amount="2500,00")
         payment = InvoicePayment.from_csv_row(row)
         assert payment.payment_amount == Decimal("2499.99")
-        assert payment.invoice_amount == Decimal("2499.99")
+        assert payment.reducing_amount == Decimal("2500.00")
 
-    def test_from_csv_row_partial_payment(self):
-        """Partial payment: payment_amount differs from invoice_amount."""
-        row = _make_payment_row(payment_amount="195,05", invoice_amount="35,49")
+    def test_from_csv_row_skonto_difference(self):
+        """Paid amount can differ from reducing amount (e.g. Skonto)."""
+        row = _make_payment_row(payment_amount="195,05", reducing_amount="200,00")
         payment = InvoicePayment.from_csv_row(row)
         assert payment.payment_amount == Decimal("195.05")
-        assert payment.invoice_amount == Decimal("35.49")
+        assert payment.reducing_amount == Decimal("200.00")
 
-    def test_from_csv_row_zero_amount(self):
-        """Zero amount parses correctly."""
-        row = _make_payment_row(payment_amount="0,00")
+    def test_from_csv_row_reversed_payment_empty_date(self):
+        """Reversed payment: date and amount are empty."""
+        row = _make_payment_row(payment_date="", payment_amount="")
         payment = InvoicePayment.from_csv_row(row)
-        assert payment.payment_amount == Decimal("0.00")
+        assert payment.payment_date is None
+        assert payment.payment_amount is None
 
-    def test_from_csv_row_date_validation(self):
-        """payment_date field_validator accepts YYYYMMDD string."""
+    def test_from_csv_row_date_format(self):
+        """Payment date YYYYMMDD is parsed to date object."""
         row = _make_payment_row(payment_date="20261231")
         payment = InvoicePayment.from_csv_row(row)
         assert payment.payment_date == date(2026, 12, 31)
 
-    def test_from_csv_row_empty_date(self):
-        """Empty payment_date results in None."""
-        row = _make_payment_row(payment_date="")
+    def test_from_csv_row_booking_position(self):
+        """BuchungPos (field 8) is parsed correctly."""
+        row = _make_payment_row(booking_position="7")
         payment = InvoicePayment.from_csv_row(row)
-        assert payment.payment_date is None
+        assert payment.booking_position == 7
 
-    def test_from_csv_row_empty_amount(self):
-        """Empty payment_amount results in None."""
-        row = _make_payment_row(payment_amount="")
+    def test_from_csv_row_system_name(self):
+        """Systemname (field 9) is parsed correctly."""
+        row = _make_payment_row(system_name="Kasse1")
         payment = InvoicePayment.from_csv_row(row)
-        assert payment.payment_amount is None
+        assert payment.system_name == "Kasse1"
 
     def test_from_csv_row_strips_invoice_number(self):
         """Leading/trailing whitespace in invoice_number is stripped."""
@@ -148,13 +161,16 @@ class TestInvoicePaymentModel:
         assert payment.payment_date == date(2026, 6, 1)
 
     def test_model_dump_serialization(self):
-        """model_dump() returns a dict with correct types."""
+        """model_dump() returns a dict with all official fields."""
         payment = _make_payment()
         data = payment.model_dump()
         assert data["invoice_number"] == "RE-2026-001"
         assert data["payment_date"] == date(2026, 1, 15)
         assert isinstance(data["payment_amount"], Decimal)
+        assert isinstance(data["reducing_amount"], Decimal)
         assert data["fiscal_year"] == 2026
+        assert data["booking_id"] == 5001
+        assert data["booking_position"] == 2
 
     def test_record_type_in_record_types_dict(self):
         """INVOICE_PAYMENT is registered in RECORD_TYPES."""
@@ -170,6 +186,7 @@ class TestInvoicePaymentModel:
         assert payment.payment_date is None
         assert payment.payment_amount is None
         assert payment.booking_id is None
+        assert payment.booking_position is None
 
 
 # =============================================================================
@@ -234,7 +251,7 @@ class TestGetInvoicePayments:
 
     @patch("collmex_cli.client.CollmexAPI")
     def test_request_row_structure(self, mock_api_cls):
-        """API request row has correct structure (INVOICE_PAYMENT_GET)."""
+        """API request row matches official INVOICE_PAYMENT_GET field order."""
         mock_api = MagicMock()
         mock_api.config.company_id = 1
         mock_api.request.return_value = []
@@ -245,9 +262,12 @@ class TestGetInvoicePayments:
 
         client.get_invoice_payments()
 
-        call_args = mock_api.request.call_args[0][0]
-        assert call_args[0] == "INVOICE_PAYMENT_GET"
-        assert call_args[1] == "1"  # company_id
+        row = mock_api.request.call_args[0][0]
+        assert row[0] == "INVOICE_PAYMENT_GET"
+        assert row[1] == "1"   # Firma Nr
+        assert row[2] == ""    # Rechnungsnummer (empty = all)
+        assert row[3] == ""    # Nur neue Zahlungen (empty = all)
+        assert row[4] == ""    # Systemname
 
     @patch("collmex_cli.client.CollmexAPI")
     def test_handles_none_rows(self, mock_api_cls):
@@ -270,11 +290,18 @@ class TestGetInvoicePayments:
 
 
 class TestInvoicePaymentsFilters:
-    """Tests for filter parameters in get_invoice_payments()."""
+    """Tests for filter parameters in get_invoice_payments().
+
+    Official INVOICE_PAYMENT_GET filters:
+    - invoice_number (Rechnungsnummer)
+    - only_new (Nur neue Zahlungen)
+    - system_name (Systemname)
+    Note: No customer_id or date filter exists in this API.
+    """
 
     @patch("collmex_cli.client.CollmexAPI")
     def test_filter_by_invoice_number(self, mock_api_cls):
-        """invoice_number filter is passed to API request row."""
+        """invoice_number is passed as field 3 of INVOICE_PAYMENT_GET."""
         mock_api = MagicMock()
         mock_api.config.company_id = 1
         mock_api.request.return_value = []
@@ -286,11 +313,11 @@ class TestInvoicePaymentsFilters:
         client.get_invoice_payments(invoice_number="RE-2026-042")
 
         row = mock_api.request.call_args[0][0]
-        assert "RE-2026-042" in row
+        assert row[2] == "RE-2026-042"
 
     @patch("collmex_cli.client.CollmexAPI")
-    def test_filter_by_customer_id(self, mock_api_cls):
-        """customer_id filter is passed to API request row."""
+    def test_only_new_flag(self, mock_api_cls):
+        """only_new=True sets field 4 to '1'."""
         mock_api = MagicMock()
         mock_api.config.company_id = 1
         mock_api.request.return_value = []
@@ -299,14 +326,14 @@ class TestInvoicePaymentsFilters:
         client = CollmexClient.__new__(CollmexClient)
         client.api = mock_api
 
-        client.get_invoice_payments(customer_id=10042)
+        client.get_invoice_payments(only_new=True)
 
         row = mock_api.request.call_args[0][0]
-        assert "10042" in row
+        assert row[3] == "1"
 
     @patch("collmex_cli.client.CollmexAPI")
-    def test_filter_by_date_from(self, mock_api_cls):
-        """date_from filter is passed in YYYYMMDD format."""
+    def test_system_name(self, mock_api_cls):
+        """system_name is passed as field 5."""
         mock_api = MagicMock()
         mock_api.config.company_id = 1
         mock_api.request.return_value = []
@@ -315,30 +342,14 @@ class TestInvoicePaymentsFilters:
         client = CollmexClient.__new__(CollmexClient)
         client.api = mock_api
 
-        client.get_invoice_payments(date_from=date(2026, 1, 1))
+        client.get_invoice_payments(system_name="Kasse1")
 
         row = mock_api.request.call_args[0][0]
-        assert "20260101" in row
+        assert row[4] == "Kasse1"
 
     @patch("collmex_cli.client.CollmexAPI")
-    def test_filter_by_date_to(self, mock_api_cls):
-        """date_to filter is passed in YYYYMMDD format."""
-        mock_api = MagicMock()
-        mock_api.config.company_id = 1
-        mock_api.request.return_value = []
-        mock_api_cls.return_value = mock_api
-
-        client = CollmexClient.__new__(CollmexClient)
-        client.api = mock_api
-
-        client.get_invoice_payments(date_to=date(2026, 12, 31))
-
-        row = mock_api.request.call_args[0][0]
-        assert "20261231" in row
-
-    @patch("collmex_cli.client.CollmexAPI")
-    def test_no_filters_uses_empty_strings(self, mock_api_cls):
-        """Without filters, optional fields are empty strings in the request."""
+    def test_no_filters_all_empty(self, mock_api_cls):
+        """Without filters, optional fields are empty strings."""
         mock_api = MagicMock()
         mock_api.config.company_id = 1
         mock_api.request.return_value = []
@@ -350,11 +361,25 @@ class TestInvoicePaymentsFilters:
         client.get_invoice_payments()
 
         row = mock_api.request.call_args[0][0]
-        # Fields 2-5 should be empty strings when no filter given
-        assert row[2] == ""  # invoice_number
-        assert row[3] == ""  # customer_id
-        assert row[4] == ""  # date_from
-        assert row[5] == ""  # date_to
+        assert row[2] == ""  # Rechnungsnummer
+        assert row[3] == ""  # Nur neue Zahlungen
+        assert row[4] == ""  # Systemname
+
+    @patch("collmex_cli.client.CollmexAPI")
+    def test_only_new_false_is_empty(self, mock_api_cls):
+        """only_new=False sends empty string (not '0')."""
+        mock_api = MagicMock()
+        mock_api.config.company_id = 1
+        mock_api.request.return_value = []
+        mock_api_cls.return_value = mock_api
+
+        client = CollmexClient.__new__(CollmexClient)
+        client.api = mock_api
+
+        client.get_invoice_payments(only_new=False)
+
+        row = mock_api.request.call_args[0][0]
+        assert row[3] == ""
 
 
 # =============================================================================
@@ -381,7 +406,7 @@ class TestInvoicePaymentsCLI:
 
     @patch("collmex_cli.main.CollmexClient", autospec=True)
     def test_json_output(self, mock_client_cls):
-        """--json flag outputs valid JSON array."""
+        """--json flag outputs valid JSON with all official fields."""
         instance = mock_client_cls.return_value.__enter__.return_value
         instance.get_invoice_payments.return_value = [
             _make_payment(),
@@ -397,11 +422,14 @@ class TestInvoicePaymentsCLI:
         assert data[0]["invoice_number"] == "RE-2026-001"
         assert data[0]["payment_date"] == "2026-01-15"
         assert data[0]["payment_amount"] == "1190.00"
+        assert data[0]["reducing_amount"] == "1190.00"
         assert data[0]["fiscal_year"] == 2026
+        assert data[0]["booking_id"] == 5001
+        assert data[0]["booking_position"] == 2
 
     @patch("collmex_cli.main.CollmexClient", autospec=True)
     def test_filter_invoice_number_passed_to_client(self, mock_client_cls):
-        """--invoice-number option is forwarded to get_invoice_payments()."""
+        """--invoice-number is forwarded to get_invoice_payments()."""
         instance = mock_client_cls.return_value.__enter__.return_value
         instance.get_invoice_payments.return_value = []
 
@@ -410,30 +438,28 @@ class TestInvoicePaymentsCLI:
         assert result.exit_code == 0
         instance.get_invoice_payments.assert_called_once_with(
             invoice_number="RE-2026-042",
-            customer_id=None,
-            date_from=None,
-            date_to=None,
+            only_new=False,
+            system_name=None,
         )
 
     @patch("collmex_cli.main.CollmexClient", autospec=True)
-    def test_filter_customer_id_passed_to_client(self, mock_client_cls):
-        """--customer-id option is forwarded to get_invoice_payments()."""
+    def test_only_new_flag(self, mock_client_cls):
+        """--only-new flag is forwarded to get_invoice_payments()."""
         instance = mock_client_cls.return_value.__enter__.return_value
         instance.get_invoice_payments.return_value = []
 
-        result = runner.invoke(app, ["invoice-payments", "--customer-id", "10042"])
+        result = runner.invoke(app, ["invoice-payments", "--only-new"])
 
         assert result.exit_code == 0
         instance.get_invoice_payments.assert_called_once_with(
             invoice_number=None,
-            customer_id=10042,
-            date_from=None,
-            date_to=None,
+            only_new=True,
+            system_name=None,
         )
 
     @patch("collmex_cli.main.CollmexClient", autospec=True)
     def test_empty_result_shows_table(self, mock_client_cls):
-        """Empty result still shows table (no crash)."""
+        """Empty result still renders without crash."""
         instance = mock_client_cls.return_value.__enter__.return_value
         instance.get_invoice_payments.return_value = []
 
@@ -457,20 +483,16 @@ class TestInvoicePaymentsCLI:
         assert "RE-002" in result.output
 
     @patch("collmex_cli.main.CollmexClient", autospec=True)
-    def test_date_filters_passed_to_client(self, mock_client_cls):
-        """--date-from and --date-to are parsed and forwarded."""
+    def test_system_name_passed_to_client(self, mock_client_cls):
+        """--system is forwarded to get_invoice_payments()."""
         instance = mock_client_cls.return_value.__enter__.return_value
         instance.get_invoice_payments.return_value = []
 
-        result = runner.invoke(
-            app,
-            ["invoice-payments", "--date-from", "2026-01-01", "--date-to", "2026-03-31"],
-        )
+        result = runner.invoke(app, ["invoice-payments", "--system", "Kasse1"])
 
         assert result.exit_code == 0
         instance.get_invoice_payments.assert_called_once_with(
             invoice_number=None,
-            customer_id=None,
-            date_from=date(2026, 1, 1),
-            date_to=date(2026, 3, 31),
+            only_new=False,
+            system_name="Kasse1",
         )
