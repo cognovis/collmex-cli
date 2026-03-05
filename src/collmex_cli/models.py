@@ -442,6 +442,60 @@ class AccountingDocument(CollmexRecord):
 
 
 # =============================================================================
+# Invoice Payment (Rechnungszahlung) - INVOICE_PAYMENT
+# =============================================================================
+
+
+class InvoicePayment(CollmexRecord):
+    """Collmex invoice payment record (INVOICE_PAYMENT).
+
+    Represents a payment received for a customer invoice.
+    Returned by INVOICE_PAYMENT_GET queries.
+    """
+
+    record_type: str = Field(default="INVOICE_PAYMENT", description="Record type identifier")
+    company_id: int = Field(default=1, description="Company ID")
+    invoice_number: str = Field(default="", description="Invoice number")
+    customer_id: int | None = Field(default=None, description="Customer number")
+    customer_name: str = Field(default="", description="Customer name")
+    payment_date: date | None = Field(default=None, description="Payment date")
+    payment_amount: Decimal | None = Field(default=None, description="Payment amount")
+    payment_method: str = Field(default="", description="Payment method")
+    booking_id: int | None = Field(default=None, description="Booking number")
+
+    @field_validator("payment_date", mode="before")
+    @classmethod
+    def parse_date(cls, v: Any) -> date | None:
+        if isinstance(v, date):
+            return v
+        if isinstance(v, str):
+            return parse_collmex_date(v)
+        return None
+
+    @classmethod
+    def from_csv_row(cls, row: list[str]) -> "InvoicePayment":
+        """Create InvoicePayment from CSV row."""
+
+        def get(idx: int, default: str = "") -> str:
+            return row[idx] if idx < len(row) else default
+
+        def get_int(idx: int, default: int = 0) -> int:
+            return _parse_int(get(idx), default)
+
+        return cls(
+            record_type=get(0),
+            company_id=get_int(1, 1),
+            invoice_number=get(2),
+            customer_id=get_int(3) or None,
+            customer_name=get(4),
+            payment_date=get(5),
+            payment_amount=parse_collmex_decimal(get(6)),
+            payment_method=get(7),
+            booking_id=get_int(8) or None,
+        )
+
+
+# =============================================================================
 # Record type mapping
 # =============================================================================
 
@@ -449,6 +503,7 @@ RECORD_TYPES: dict[str, type[CollmexRecord]] = {
     "CMXLIF": Vendor,
     "OPEN_ITEM": OpenItem,
     "ACCDOC": AccountingDocument,
+    "INVOICE_PAYMENT": InvoicePayment,
 }
 
 

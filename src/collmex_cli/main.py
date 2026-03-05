@@ -15,7 +15,7 @@ from . import __version__
 from .api import CollmexAuthError, CollmexError
 from .app_config import load_config
 from .client import CollmexClient
-from .models import Vendor, VendorInvoice
+from .models import InvoicePayment, Vendor, VendorInvoice
 
 
 def check_for_update() -> None:
@@ -298,6 +298,57 @@ def list_bookings(
                 rows,
             )
             console.print(f"\n[dim]Total: {len(bookings)} bookings[/dim]")
+    except Exception as e:
+        handle_error(e)
+
+
+# =============================================================================
+# Invoice Payments Commands
+# =============================================================================
+
+
+@app.command("invoice-payments")
+def list_invoice_payments(
+    invoice_number: Annotated[str | None, typer.Option("--invoice-number", "-i", help="Filter by invoice number")] = None,
+    customer_id: Annotated[int | None, typer.Option("--customer-id", "-c", help="Filter by customer ID")] = None,
+    date_from: Annotated[str | None, typer.Option("--date-from", help="Payment date from (YYYY-MM-DD)")] = None,
+    date_to: Annotated[str | None, typer.Option("--date-to", help="Payment date to (YYYY-MM-DD)")] = None,
+    json_output: Annotated[bool, typer.Option("--json", "-j", help="Output as JSON")] = False,
+) -> None:
+    """List invoice payments (Rechnungszahlungen)."""
+    try:
+        from_date = date.fromisoformat(date_from) if date_from else None
+        to_date = date.fromisoformat(date_to) if date_to else None
+
+        with CollmexClient() as client:
+            payments = client.get_invoice_payments(
+                invoice_number=invoice_number,
+                customer_id=customer_id,
+                date_from=from_date,
+                date_to=to_date,
+            )
+
+        if json_output:
+            output_json([p.model_dump() for p in payments])
+        else:
+            rows = [
+                [
+                    p.invoice_number,
+                    p.customer_id,
+                    p.customer_name,
+                    p.payment_date,
+                    p.payment_amount,
+                    p.payment_method,
+                    p.booking_id,
+                ]
+                for p in payments
+            ]
+            output_table(
+                "Invoice Payments",
+                ["Invoice #", "Customer ID", "Customer", "Date", "Amount", "Method", "Booking ID"],
+                rows,
+            )
+            console.print(f"\n[dim]Total: {len(payments)} payments[/dim]")
     except Exception as e:
         handle_error(e)
 

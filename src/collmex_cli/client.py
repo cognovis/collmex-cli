@@ -6,6 +6,7 @@ from .api import CollmexAPI
 from .config import CollmexConfig
 from .models import (
     AccountingDocument,
+    InvoicePayment,
     OpenItem,
     Vendor,
     VendorInvoice,
@@ -333,6 +334,42 @@ class CollmexClient:
             "last_date": last_date,
             "booking_count": len(bookings),
         }
+
+    # =========================================================================
+    # Invoice Payments (Rechnungszahlungen)
+    # =========================================================================
+
+    def get_invoice_payments(
+        self,
+        invoice_number: str | None = None,
+        customer_id: int | None = None,
+        date_from: date | None = None,
+        date_to: date | None = None,
+    ) -> list[InvoicePayment]:
+        """Get invoice payments from Collmex.
+
+        Args:
+            invoice_number: Filter by invoice number
+            customer_id: Filter by customer ID
+            date_from: Start date filter (payment date)
+            date_to: End date filter (payment date)
+
+        Returns:
+            List of InvoicePayment objects
+        """
+        row = ["INVOICE_PAYMENT_GET"]
+        row.append(str(self.api.config.company_id))
+        row.append(invoice_number or "")
+        row.append(str(customer_id) if customer_id else "")
+        row.append(format_collmex_date(date_from) if date_from else "")
+        row.append(format_collmex_date(date_to) if date_to else "")
+
+        results = self.api.request(row)
+        return [
+            InvoicePayment.from_csv_row(r)
+            for r in results
+            if r and r[0] == "INVOICE_PAYMENT"
+        ]
 
     def get_unmatched_bank_transactions(
         self,
