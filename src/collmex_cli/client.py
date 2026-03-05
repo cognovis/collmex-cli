@@ -9,6 +9,7 @@ from .models import (
     AccountingDocument,
     Customer,
     Invoice,
+    InvoicePayment,
     OpenItem,
     Vendor,
     VendorInvoice,
@@ -477,6 +478,48 @@ class CollmexClient:
 
         results = self.api.request(row)
         return [AccountBalance.from_csv_row(r) for r in results if r and r[0] == "ACC_BAL"]
+
+    # =========================================================================
+    # Invoice Payments (Rechnungszahlungen)
+    # =========================================================================
+
+    def get_invoice_payments(
+        self,
+        invoice_number: str | None = None,
+        only_new: bool = False,
+        system_name: str | None = None,
+    ) -> list[InvoicePayment]:
+        """Get invoice payments from Collmex.
+
+        Only works for invoices imported via CMXUMS (external invoices),
+        not for invoices created directly in Collmex.
+
+        Official query fields (INVOICE_PAYMENT_GET):
+          2: Firma Nr
+          3: Rechnungsnummer — optional, filter by invoice number
+          4: Nur neue Zahlungen — 1 = only new since last query
+          5: Systemname — external system name (tracks last query time)
+
+        Args:
+            invoice_number: Filter by invoice number (optional)
+            only_new: If True, return only payments new since last query for system_name
+            system_name: External system name (used with only_new for change tracking)
+
+        Returns:
+            List of InvoicePayment objects
+        """
+        row = ["INVOICE_PAYMENT_GET"]
+        row.append(str(self.api.config.company_id))
+        row.append(invoice_number or "")
+        row.append("1" if only_new else "")
+        row.append(system_name or "")
+
+        results = self.api.request(row)
+        return [
+            InvoicePayment.from_csv_row(r)
+            for r in results
+            if r and r[0] == "INVOICE_PAYMENT"
+        ]
 
     def get_unmatched_bank_transactions(
         self,

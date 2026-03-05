@@ -692,6 +692,76 @@ class AccountBalance(CollmexRecord):
 
 
 # =============================================================================
+# Invoice Payment (Rechnungszahlung) - INVOICE_PAYMENT
+# =============================================================================
+
+
+class InvoicePayment(CollmexRecord):
+    """Collmex invoice payment record (INVOICE_PAYMENT).
+
+    Represents a payment received for a customer invoice.
+    Returned by INVOICE_PAYMENT_GET queries.
+
+    Official API field layout (source: https://www.collmex.de/handbuch_buchhaltung_pro.html#api):
+      1: Satzart          — INVOICE_PAYMENT
+      2: Rechnungsnummer  — Invoice number
+      3: Datum            — Payment date (YYYYMMDD)
+      4: Gezahlter Betrag — Actually paid via bank/cash
+      5: Reduzierender Betrag — Open item reduced by this amount (may differ due to Skonto)
+      6: Geschäftsjahr    — Fiscal year of the booking
+      7: BuchungNr        — Booking number
+      8: BuchungPos       — Booking position
+      9: Systemname       — External system name
+
+    Note: Geschäftsjahr + BuchungNr + BuchungPos uniquely identify a payment.
+    When a payment is reversed, Datum and Betrag are empty.
+    """
+
+    record_type: str = Field(default="INVOICE_PAYMENT", description="Record type identifier")
+    invoice_number: str = Field(default="", description="Invoice number (Rechnungsnummer)")
+    payment_date: date | None = Field(default=None, description="Payment date (Datum)")
+    payment_amount: Decimal | None = Field(default=None, description="Actually paid amount (Gezahlter Betrag)")
+    reducing_amount: Decimal | None = Field(default=None, description="Open item reduction (Reduzierender Betrag) — may differ due to Skonto/discounts")
+    fiscal_year: int = Field(default=0, description="Fiscal year of booking (Geschäftsjahr)")
+    booking_id: int | None = Field(default=None, description="Booking number (BuchungNr)")
+    booking_position: int | None = Field(default=None, description="Booking position (BuchungPos)")
+    system_name: str = Field(default="", description="External system name (Systemname)")
+
+    @field_validator("payment_date", mode="before")
+    @classmethod
+    def parse_date(cls, v: Any) -> date | None:
+        if isinstance(v, date):
+            return v
+        if isinstance(v, str):
+            return parse_collmex_date(v)
+        return None
+
+    @classmethod
+    def from_csv_row(cls, row: list[str]) -> "InvoicePayment":
+        """Create InvoicePayment from CSV row.
+
+        Field indices are 0-based (CSV row[0] = Satzart = field 1 in docs).
+        """
+
+        def get(idx: int, default: str = "") -> str:
+            return row[idx] if idx < len(row) else default
+
+        def get_int(idx: int, default: int = 0) -> int:
+            return _parse_int(get(idx), default)
+
+        return cls(
+            record_type=get(0),
+            invoice_number=get(1).strip(),
+            payment_date=get(2),
+            payment_amount=parse_collmex_decimal(get(3)),
+            reducing_amount=parse_collmex_decimal(get(4)),
+            fiscal_year=get_int(5),
+            booking_id=get_int(6) or None,
+            booking_position=get_int(7) or None,
+            system_name=get(8),
+        )
+
+# =============================================================================
 # Record type mapping
 # =============================================================================
 
@@ -701,6 +771,7 @@ RECORD_TYPES: dict[str, type[CollmexRecord]] = {
     "OPEN_ITEM": OpenItem,
     "ACCDOC": AccountingDocument,
     "ACC_BAL": AccountBalance,
+    "INVOICE_PAYMENT": InvoicePayment,
 }
 
 

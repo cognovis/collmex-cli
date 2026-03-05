@@ -15,7 +15,7 @@ from . import __version__
 from .api import CollmexAuthError, CollmexError
 from .app_config import load_config
 from .client import CollmexClient
-from .models import AccountBalance, Customer, Invoice, Vendor, VendorInvoice
+from .models import AccountBalance, Customer, Invoice, InvoicePayment, Vendor, VendorInvoice
 
 
 def check_for_update() -> None:
@@ -479,6 +479,56 @@ def list_balances(
                 rows,
             )
             console.print(f"\n[dim]Total: {len(balances)} accounts[/dim]")
+    except Exception as e:
+        handle_error(e)
+
+
+# =============================================================================
+# Invoice Payments Commands
+# =============================================================================
+
+
+@app.command("invoice-payments")
+def list_invoice_payments(
+    invoice_number: Annotated[str | None, typer.Option("--invoice-number", "-i", help="Filter by invoice number")] = None,
+    only_new: Annotated[bool, typer.Option("--only-new", help="Only return new payments since last query")] = False,
+    system_name: Annotated[str | None, typer.Option("--system", help="System name for change tracking")] = None,
+    json_output: Annotated[bool, typer.Option("--json", "-j", help="Output as JSON")] = False,
+) -> None:
+    """List invoice payments (Rechnungszahlungen).
+
+    Only works for invoices imported via CMXUMS (external invoices).
+    Filter by invoice number, or use --only-new to fetch only new payments since last query.
+    """
+    try:
+        with CollmexClient() as client:
+            payments = client.get_invoice_payments(
+                invoice_number=invoice_number,
+                only_new=only_new,
+                system_name=system_name,
+            )
+
+        if json_output:
+            output_json([p.model_dump() for p in payments])
+        else:
+            rows = [
+                [
+                    p.invoice_number,
+                    p.payment_date,
+                    p.payment_amount,
+                    p.reducing_amount,
+                    p.fiscal_year,
+                    p.booking_id,
+                    p.booking_position,
+                ]
+                for p in payments
+            ]
+            output_table(
+                "Invoice Payments",
+                ["Invoice #", "Date", "Paid", "Reduces OP by", "Year", "Booking", "Pos"],
+                rows,
+            )
+            console.print(f"\n[dim]Total: {len(payments)} payments[/dim]")
     except Exception as e:
         handle_error(e)
 

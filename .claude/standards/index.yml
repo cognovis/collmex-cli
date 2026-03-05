@@ -1,0 +1,23 @@
+# collmex-cli project standards
+# These supplement the global ~/.claude/standards/index.yml
+
+standards:
+  collmex/api-reference:
+    description: "Collmex API record type field definitions (ACCDOC, INVOICE_PAYMENT, OPEN_ITEM, VENDOR, etc.). MUST be loaded before implementing any API record type."
+    triggers:
+      - "collmex"
+      - "ACCDOC"
+      - "INVOICE_PAYMENT"
+      - "OPEN_ITEM"
+      - "CMXLIF"
+      - "CMXUMS"
+      - "CMXLRN"
+      - "VENDOR_GET"
+      - "CUSTOMER_GET"
+      - "OPEN_ITEMS_GET"
+      - "INVOICE_PAYMENT_GET"
+      - "ACCDOC_GET"
+      - "api.py"
+      - "client.py"
+      - "models.py"
+    path: "collmex-api.md"
