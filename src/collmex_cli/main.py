@@ -584,8 +584,459 @@ def create_zugferd(
             save_zugferd_xml(xml_content, output)
             console.print(f"[green]ZUGFeRD XML saved to {output}[/green]")
         else:
-            print(xml_content)
+            print(xml_content.decode("utf-8") if isinstance(xml_content, bytes) else xml_content)
 
+    except Exception as e:
+        handle_error(e)
+
+
+# =============================================================================
+# Web Automation Commands
+# =============================================================================
+
+
+@app.command("upload-statement")
+def upload_statement(
+    file: Annotated[str, typer.Argument(help="Path to MT940/CAMT bank statement file")],
+    account: Annotated[str | None, typer.Option("--account", "-a", help="Bank account name from config")] = None,
+    json_output: Annotated[bool, typer.Option("--json", "-j", help="Output as JSON")] = False,
+) -> None:
+    """Upload a bank statement (MT940/CAMT) via Collmex web UI.
+
+    Requires playwright-cli and a saved auth state. Create one with:
+        playwright-cli -s=collmex open https://www.collmex.de
+        # Log in manually
+        playwright-cli -s=collmex state-save ~/.local/share/collmex-cli/auth-state.json
+        playwright-cli -s=collmex close
+    """
+    from pathlib import Path
+
+    from .web import CollmexWeb, CollmexWebError, PlaywrightCliError
+
+    file_path = Path(file)
+    if not file_path.exists():
+        err_console.print(f"[red]File not found: {file}[/red]")
+        raise typer.Exit(1)
+
+    cfg = load_config()
+    account_name = account or next(iter(cfg.bank_accounts), None)
+    if not account_name:
+        err_console.print("[red]No account specified and none configured.[/red]")
+        err_console.print("Use --account NAME or configure [bank_accounts] in config.toml")
+        raise typer.Exit(1)
+
+    try:
+        web = CollmexWeb(app_config=cfg)
+        try:
+            result = web.upload_statement(file_path, account_name)
+        finally:
+            web.close()
+
+        if json_output:
+            output_json(result)
+        else:
+            console.print(f"[green]{result['message']}[/green]")
+            console.print(f"File: {result['file']}")
+            console.print(f"Account: {result['account']}")
+    except (PlaywrightCliError, CollmexWebError) as e:
+        handle_error(e)
+    except Exception as e:
+        handle_error(e)
+
+
+@app.command("import-statements")
+def import_statements(
+    account: Annotated[str | None, typer.Option("--account", "-a", help="Single account name from config (default: all)")] = None,
+    date_from: Annotated[str | None, typer.Option("--from", help="Export start date (YYYY-MM-DD, default: last booking date)")] = None,
+    all_accounts: Annotated[bool, typer.Option("--all", help="Process all configured MoneyMoney accounts")] = False,
+    json_output: Annotated[bool, typer.Option("--json", "-j", help="Output as JSON")] = False,
+) -> None:
+    """Import bank statements from MoneyMoney into Collmex.
+
+    Full roundtrip:
+    1. Get last import date from Collmex (bank-status)
+    2. Export from MoneyMoney via `mm export` (sta format)
+    3. Upload each .sta file to Collmex web UI
+
+    Requires MoneyMoney to be running and unlocked.
+    Requires playwright-cli with a saved Collmex session.
+    """
+    import subprocess
+    import tempfile
+    from pathlib import Path
+
+    from .web import CollmexWeb, CollmexWebError, PlaywrightCliError
+
+    try:
+        cfg = load_config()
+
+        if not cfg.mm_accounts:
+            err_console.print("[red]No MoneyMoney accounts configured.[/red]")
+            err_console.print("Add [mm_accounts] section to config.toml:")
+            err_console.print('[dim]"Fyrst Base" = "Fyrst (1200)"[/dim]')
+            raise typer.Exit(1)
+
+        # Determine which accounts to process
+        if account:
+            # Find MM account(s) mapping to this config account
+            mm_pairs = [(mm, cfg_name) for mm, cfg_name in cfg.mm_accounts.items() if cfg_name == account]
+            if not mm_pairs:
+                # Maybe user passed the MM name directly
+                if account in cfg.mm_accounts:
+                    mm_pairs = [(account, cfg.mm_accounts[account])]
+                else:
+                    err_console.print(f"[red]Account '{account}' not found in mm_accounts config.[/red]")
+                    raise typer.Exit(1)
+        else:
+            mm_pairs = list(cfg.mm_accounts.items())
+
+        # Get last booking dates for start date determination
+        last_dates: dict[str, date | None] = {}
+        if not date_from:
+            with CollmexClient() as client:
+                for _mm_name, cfg_name in mm_pairs:
+                    acct_nr = cfg.bank_accounts.get(cfg_name)
+                    if acct_nr:
+                        result = client.get_last_bank_booking_date(bank_account=acct_nr)
+                        last_dates[cfg_name] = result.get("last_date")
+
+        results = []
+        web = CollmexWeb(app_config=cfg)
+        try:
+            for mm_name, cfg_name in mm_pairs:
+                console.print(f"\n[bold]{cfg_name}[/bold] (MoneyMoney: {mm_name})")
+
+                # Determine export start date
+                if date_from:
+                    start = date_from
+                elif last_dates.get(cfg_name):
+                    start = str(last_dates[cfg_name])
+                else:
+                    err_console.print(f"  [yellow]No last booking date found, skipping.[/yellow]")
+                    err_console.print("  Use --from DATE to specify a start date.")
+                    continue
+
+                console.print(f"  Exporting from {start}...")
+
+                # Export from MoneyMoney via mm CLI
+                with tempfile.NamedTemporaryFile(suffix=".sta", delete=False) as tmp:
+                    tmp_path = Path(tmp.name)
+
+                try:
+                    mm_result = subprocess.run(
+                        ["mm", "export", "-a", mm_name, "--from", start, "-f", "sta", "-o", str(tmp_path)],
+                        capture_output=True,
+                        text=True,
+                        timeout=30,
+                    )
+                    if mm_result.returncode != 0:
+                        err_console.print(f"  [red]mm export failed:[/red] {mm_result.stderr.strip()}")
+                        continue
+
+                    # Check if file has content
+                    if not tmp_path.exists() or tmp_path.stat().st_size == 0:
+                        console.print("  [dim]No new transactions to export.[/dim]")
+                        continue
+
+                    console.print(f"  Uploading {tmp_path.name} ({tmp_path.stat().st_size} bytes)...")
+
+                    # Upload to Collmex
+                    upload_result = web.upload_statement(tmp_path, cfg_name)
+                    console.print(f"  [green]{upload_result['message']}[/green]")
+                    results.append(upload_result)
+
+                finally:
+                    tmp_path.unlink(missing_ok=True)
+
+        finally:
+            web.close()
+
+        if json_output:
+            output_json(results)
+        elif not results:
+            console.print("\n[dim]No statements were imported.[/dim]")
+        else:
+            console.print(f"\n[green]Done: {len(results)} account(s) imported.[/green]")
+
+    except (PlaywrightCliError, CollmexWebError) as e:
+        handle_error(e)
+    except Exception as e:
+        handle_error(e)
+
+
+@app.command("import-statements")
+def import_statements(
+    account: Annotated[str | None, typer.Option("--account", "-a", help="Single account name from config (default: all)")] = None,
+    date_from: Annotated[str | None, typer.Option("--from", help="Export start date (YYYY-MM-DD, default: last booking date)")] = None,
+    all_accounts: Annotated[bool, typer.Option("--all", help="Process all configured MoneyMoney accounts")] = False,
+    json_output: Annotated[bool, typer.Option("--json", "-j", help="Output as JSON")] = False,
+) -> None:
+    """Import bank statements from MoneyMoney into Collmex.
+
+    Full roundtrip:
+    1. Get last import date from Collmex (bank-status)
+    2. Export from MoneyMoney via `mm export` (sta format)
+    3. Upload each .sta file to Collmex web UI
+
+    Requires MoneyMoney to be running and unlocked.
+    Requires playwright-cli with a saved Collmex session.
+    """
+    import subprocess
+    import tempfile
+    from pathlib import Path
+
+    from .web import CollmexWeb, CollmexWebError, PlaywrightCliError
+
+    try:
+        cfg = load_config()
+
+        if not cfg.mm_accounts:
+            err_console.print("[red]No MoneyMoney accounts configured.[/red]")
+            err_console.print("Add [mm_accounts] section to config.toml:")
+            err_console.print('[dim]"Fyrst Base" = "Fyrst (1200)"[/dim]')
+            raise typer.Exit(1)
+
+        # Determine which accounts to process
+        if account:
+            # Find MM account(s) mapping to this config account
+            mm_pairs = [
+                (mm, cfg_name)
+                for mm, cfg_name in cfg.mm_accounts.items()
+                if cfg_name == account
+            ]
+            if not mm_pairs:
+                # Maybe user passed the MM name directly
+                if account in cfg.mm_accounts:
+                    mm_pairs = [(account, cfg.mm_accounts[account])]
+                else:
+                    err_console.print(
+                        f"[red]Account '{account}' not found in mm_accounts config.[/red]"
+                    )
+                    raise typer.Exit(1)
+        else:
+            mm_pairs = list(cfg.mm_accounts.items())
+
+        # Get last booking dates for start date determination
+        last_dates: dict[str, date | None] = {}
+        if not date_from:
+            with CollmexClient() as client:
+                for _mm_name, cfg_name in mm_pairs:
+                    acct_nr = cfg.bank_accounts.get(cfg_name)
+                    if acct_nr:
+                        result = client.get_last_bank_booking_date(bank_account=acct_nr)
+                        last_dates[cfg_name] = result.get("last_date")
+
+        results = []
+        web = CollmexWeb(app_config=cfg)
+        try:
+            for mm_name, cfg_name in mm_pairs:
+                console.print(f"\n[bold]{cfg_name}[/bold] (MoneyMoney: {mm_name})")
+
+                # Determine export start date
+                if date_from:
+                    start = date_from
+                elif last_dates.get(cfg_name):
+                    start = str(last_dates[cfg_name])
+                else:
+                    err_console.print(
+                        "  [yellow]No last booking date found, skipping.[/yellow]"
+                    )
+                    err_console.print("  Use --from DATE to specify a start date.")
+                    continue
+
+                console.print(f"  Exporting from {start}...")
+
+                # Export from MoneyMoney via mm CLI
+                with tempfile.NamedTemporaryFile(suffix=".sta", delete=False) as tmp:
+                    tmp_path = Path(tmp.name)
+
+                try:
+                    mm_result = subprocess.run(
+                        [
+                            "mm",
+                            "export",
+                            "-a",
+                            mm_name,
+                            "--from",
+                            start,
+                            "-f",
+                            "sta",
+                            "-o",
+                            str(tmp_path),
+                        ],
+                        capture_output=True,
+                        text=True,
+                        timeout=30,
+                    )
+                    if mm_result.returncode != 0:
+                        err_console.print(
+                            f"  [red]mm export failed:[/red] {mm_result.stderr.strip()}"
+                        )
+                        continue
+
+                    # Check if file has content
+                    if not tmp_path.exists() or tmp_path.stat().st_size == 0:
+                        console.print("  [dim]No new transactions to export.[/dim]")
+                        continue
+
+                    console.print(
+                        f"  Uploading {tmp_path.name} ({tmp_path.stat().st_size} bytes)..."
+                    )
+
+                    # Upload to Collmex
+                    upload_result = web.upload_statement(tmp_path, cfg_name)
+                    console.print(f"  [green]{upload_result['message']}[/green]")
+                    results.append(upload_result)
+
+                finally:
+                    tmp_path.unlink(missing_ok=True)
+
+        finally:
+            web.close()
+
+        if json_output:
+            output_json(results)
+        elif not results:
+            console.print("\n[dim]No statements were imported.[/dim]")
+        else:
+            console.print(f"\n[green]Done: {len(results)} account(s) imported.[/green]")
+
+    except (PlaywrightCliError, CollmexWebError) as e:
+        handle_error(e)
+    except Exception as e:
+        handle_error(e)
+
+
+@app.command("pending-bookings")
+def pending_bookings(
+    account: Annotated[str | None, typer.Option("--account", "-a", help="Bank account name from config")] = None,
+    json_output: Annotated[bool, typer.Option("--json", "-j", help="Output as JSON")] = False,
+) -> None:
+    """Show pending bookings ("Zu buchen") from Collmex web UI.
+
+    Lists imported but not yet booked bank transactions.
+
+    Requires playwright-cli and a saved auth state.
+    """
+    from .web import CollmexWeb, CollmexWebError, PlaywrightCliError
+
+    cfg = load_config()
+    account_name = account or next(iter(cfg.bank_accounts), None)
+    if not account_name:
+        err_console.print("[red]No account specified and none configured.[/red]")
+        err_console.print("Use --account NAME or configure [bank_accounts] in config.toml")
+        raise typer.Exit(1)
+
+    try:
+        web = CollmexWeb(app_config=cfg)
+        try:
+            bookings = web.get_pending_bookings(account_name)
+        finally:
+            web.close()
+
+        if json_output:
+            output_json(bookings)
+        else:
+            if not bookings:
+                console.print("[dim]No pending bookings found.[/dim]")
+                return
+
+            # Use keys from first row as columns
+            columns = list(bookings[0].keys())
+            rows = [[b.get(c, "") for c in columns] for b in bookings]
+            output_table(f"Pending Bookings ({account_name})", columns, rows)
+            console.print(f"\n[dim]Total: {len(bookings)} pending bookings[/dim]")
+    except (PlaywrightCliError, CollmexWebError) as e:
+        handle_error(e)
+    except Exception as e:
+        handle_error(e)
+
+
+@app.command("bank-statements")
+def bank_statements(
+    account: Annotated[str | None, typer.Option("--account", "-a", help="Bank account name from config")] = None,
+    date_from: Annotated[str | None, typer.Option("--from", help="Start date DD.MM.YYYY")] = None,
+    status: Annotated[str | None, typer.Option("--status", "-s", help="Filter: pending, deferred, excluded, booked, or all")] = None,
+    json_output: Annotated[bool, typer.Option("--json", "-j", help="Output as JSON")] = False,
+    all_accounts: Annotated[bool, typer.Option("--all", help="Query all configured bank accounts")] = False,
+) -> None:
+    """Show bank statements from Collmex with structured status info.
+
+    Returns each transaction with a normalized status:
+      pending  — "Zu buchen" (imported, awaiting booking)
+      deferred — "Später buchen" (postponed, e.g. missing invoice)
+      excluded — "Nicht buchen" (intentionally skipped)
+      booked   — has a Buchung Nr (booking document number)
+
+    Designed for LLM consumption with --json.
+
+    Requires playwright-cli and a saved auth state.
+    """
+    from .web import CollmexWeb, CollmexWebError, PlaywrightCliError
+
+    # Map CLI status names to Collmex German filter values
+    STATUS_TO_COLLMEX = {
+        "pending": "Zu buchen",
+        "deferred": "Später buchen",
+        "excluded": "Nicht buchen",
+        "booked": "Gebucht",
+        "all": None,
+    }
+
+    collmex_status = None
+    if status:
+        if status not in STATUS_TO_COLLMEX:
+            err_console.print(f"[red]Unknown status '{status}'. Use: pending, deferred, excluded, booked, all[/red]")
+            raise typer.Exit(1)
+        collmex_status = STATUS_TO_COLLMEX[status]
+
+    cfg = load_config()
+
+    if all_accounts:
+        accounts = list(cfg.bank_accounts.keys())
+    elif account:
+        accounts = [account]
+    else:
+        first = next(iter(cfg.bank_accounts), None)
+        if not first:
+            err_console.print("[red]No account specified and none configured.[/red]")
+            raise typer.Exit(1)
+        accounts = [first]
+
+    try:
+        web = CollmexWeb(app_config=cfg)
+        try:
+            all_statements: list[dict] = []
+            for acct in accounts:
+                stmts = web.get_statements(acct, date_from=date_from, status=collmex_status)
+                all_statements.extend(stmts)
+        finally:
+            web.close()
+
+        if json_output:
+            output_json(all_statements)
+        else:
+            if not all_statements:
+                console.print("[dim]No statements found.[/dim]")
+                return
+
+            columns = ["date", "amount", "status", "booking_nr", "name", "purpose"]
+            rows = [[s.get(c, "") for c in columns] for s in all_statements]
+            # Show account in title if single, add column if multiple
+            if len(accounts) > 1:
+                columns.insert(0, "account")
+                rows = [[s.get("account", "")] + r for s, r in zip(all_statements, rows)]
+            title = f"Bank Statements ({accounts[0]})" if len(accounts) == 1 else "Bank Statements (all accounts)"
+            output_table(title, columns, rows)
+
+            # Summary by status
+            from collections import Counter
+            counts = Counter(s["status"] for s in all_statements)
+            parts = [f"{v} {k}" for k, v in sorted(counts.items())]
+            console.print(f"\n[dim]Total: {len(all_statements)} — {', '.join(parts)}[/dim]")
+
+    except (PlaywrightCliError, CollmexWebError) as e:
+        handle_error(e)
     except Exception as e:
         handle_error(e)
 

@@ -1,4 +1,11 @@
-"""Configuration management for Collmex CLI."""
+"""Configuration management for Collmex CLI.
+
+Configuration priority (highest wins):
+1. Environment variables (COLLMEX_* prefix)
+2. XDG config file (~/.config/collmex-cli/config.toml) [credentials] section
+3. .env file in current directory
+4. Field defaults
+"""
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -7,31 +14,26 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class CollmexConfig(BaseSettings):
     """Collmex API and related configuration.
 
-    Configuration is loaded from environment variables with COLLMEX_ prefix,
-    or from a .env file in the current directory.
+    Configuration is loaded from (in priority order):
+    1. Environment variables with COLLMEX_ prefix
+    2. [credentials] section in ~/.config/collmex-cli/config.toml
+    3. .env file in the current directory
 
-    Required environment variables:
-        COLLMEX_CUSTOMER_ID: Your Collmex customer ID
-        COLLMEX_COMPANY_ID: Your Collmex company ID (usually 1)
-        COLLMEX_USERNAME: Your Collmex username
-        COLLMEX_PASSWORD: Your Collmex password
+    Required:
+        customer_id: Your Collmex customer ID
+        username: Your Collmex username
+        password: Your Collmex password
+
+    Optional:
+        company_id: Your Collmex company ID (default: 1)
 
     Optional - SMTP (for sending invoices):
-        COLLMEX_SMTP_HOST: SMTP server hostname
-        COLLMEX_SMTP_PORT: SMTP server port (default: 587)
-        COLLMEX_SMTP_USER: SMTP username
-        COLLMEX_SMTP_PASSWORD: SMTP password
-        COLLMEX_SMTP_FROM: Sender email address
-        COLLMEX_ACCOUNTING_EMAIL: Recipient for invoices (buchhaltung@...)
+        smtp_host, smtp_port, smtp_user, smtp_password, smtp_from
+        accounting_email: Recipient for invoices (buchhaltung@...)
 
     Optional - Buyer info (your company, for ZUGFeRD):
-        COLLMEX_BUYER_NAME: Company name
-        COLLMEX_BUYER_STREET: Street address
-        COLLMEX_BUYER_ZIP: Postal code
-        COLLMEX_BUYER_CITY: City
-        COLLMEX_BUYER_COUNTRY: Country code (default: DE)
-        COLLMEX_BUYER_VAT_ID: VAT ID (USt-IdNr)
-        COLLMEX_BUYER_EMAIL: Contact email
+        buyer_name, buyer_street, buyer_zip, buyer_city,
+        buyer_country, buyer_vat_id, buyer_email
     """
 
     model_config = SettingsConfigDict(
@@ -42,12 +44,18 @@ class CollmexConfig(BaseSettings):
     )
 
     # ==========================================================================
-    # Collmex API credentials (required)
+    # Collmex API credentials (required for CSV API commands)
     # ==========================================================================
     customer_id: str = Field(description="Collmex customer ID")
     company_id: int = Field(default=1, description="Collmex company ID")
-    username: str = Field(description="Collmex username")
-    password: str = Field(description="Collmex password")
+    username: str = Field(default="", description="Collmex API username")
+    password: str = Field(default="", description="Collmex API password")
+
+    # ==========================================================================
+    # Collmex Web credentials (for upload-statement, pending-bookings)
+    # ==========================================================================
+    web_username: str = Field(default="", description="Collmex web login username")
+    web_password: str = Field(default="", description="Collmex web login password")
 
     # ==========================================================================
     # SMTP configuration (optional, for invoice-send)
@@ -89,6 +97,40 @@ class CollmexConfig(BaseSettings):
         return all([self.buyer_name, self.buyer_street, self.buyer_zip, self.buyer_city])
 
 
+def _load_toml_credentials() -> dict[str, str]:
+    """Load credentials from XDG config TOML file.
+
+    Returns a flat dict with COLLMEX_ prefixed keys suitable for
+    pydantic-settings env var initialization.
+    """
+    from .app_config import config_path
+
+    path = config_path()
+    if not path.exists():
+        return {}
+
+    import tomllib
+
+    with open(path, "rb") as f:
+        data = tomllib.load(f)
+
+    creds = data.get("credentials", {})
+    if not creds:
+        return creds
+
+    # Map TOML keys to env-var-style keys for pydantic-settings
+    return {k: str(v) for k, v in creds.items()}
+
+
 def get_config() -> CollmexConfig:
-    """Load and return the Collmex configuration."""
+    """Load and return the Collmex configuration.
+
+    Reads credentials from XDG config TOML first, then lets
+    environment variables override (pydantic-settings default behavior).
+    """
+    toml_creds = _load_toml_credentials()
+    if toml_creds:
+        # Pass TOML values as fallback init kwargs;
+        # env vars still take priority via pydantic-settings
+        return CollmexConfig(**toml_creds)
     return CollmexConfig()

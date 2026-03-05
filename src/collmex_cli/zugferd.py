@@ -28,7 +28,7 @@ def create_zugferd_xml(
     payment_terms_text: str | None = None,
     due_date: date | None = None,
     notes: str | None = None,
-) -> str:
+) -> bytes:
     """Create a ZUGFeRD 2.x XML document for a vendor invoice.
 
     Args:
@@ -48,7 +48,7 @@ def create_zugferd_xml(
         notes: Additional notes for the invoice
 
     Returns:
-        XML string in UN/CEFACT CII format (EN 16931)
+        XML bytes in UN/CEFACT CII format (EN 16931)
     """
     config = config or get_config()
 
@@ -82,9 +82,7 @@ def create_zugferd_xml(
     doc.trade.agreement.seller.address.country_id = vendor.country or "DE"
 
     if vendor.email:
-        doc.trade.agreement.seller.electronic_address.add(
-            (vendor.email, "EM")
-        )
+        doc.trade.agreement.seller.electronic_address.uri_ID = (vendor.email, "EM")
 
     if vendor.vat_id:
         tax_reg = TaxRegistration()
@@ -106,9 +104,7 @@ def create_zugferd_xml(
     doc.trade.agreement.buyer.address.country_id = config.buyer_country
 
     if config.buyer_email:
-        doc.trade.agreement.buyer.electronic_address.add(
-            (config.buyer_email, "EM")
-        )
+        doc.trade.agreement.buyer.electronic_address.uri_ID = (config.buyer_email, "EM")
 
     # Line items
     total_net = Decimal("0.00")
@@ -189,18 +185,18 @@ def create_zugferd_xml(
     doc.trade.settlement.monetary_summation.tax_total = (total_tax, "EUR")
     doc.trade.settlement.monetary_summation.grand_total = total_net + total_tax
     doc.trade.settlement.monetary_summation.prepaid_total = Decimal("0.00")
-    doc.trade.settlement.monetary_summation.due_payable = total_net + total_tax
+    doc.trade.settlement.monetary_summation.due_amount = total_net + total_tax
 
     # Generate XML
     return doc.serialize(schema="FACTUR-X_EN16931")
 
 
-def save_zugferd_xml(xml_content: str, output_path: Path | str) -> None:
+def save_zugferd_xml(xml_content: bytes, output_path: Path | str) -> None:
     """Save ZUGFeRD XML to a file.
 
     Args:
-        xml_content: The XML string
+        xml_content: The XML bytes
         output_path: Path to save the file
     """
     path = Path(output_path)
-    path.write_text(xml_content, encoding="utf-8")
+    path.write_bytes(xml_content)

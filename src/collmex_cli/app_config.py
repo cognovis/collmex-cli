@@ -37,6 +37,14 @@ class AppConfig(BaseModel):
         default_factory=lambda: dict(DEFAULT_BANK_ACCOUNTS),
         description="Mapping of account name to account number",
     )
+    bank_accounts_web: dict[str, str] = Field(
+        default_factory=dict,
+        description="Mapping of account name to Collmex web dropdown text",
+    )
+    mm_accounts: dict[str, str] = Field(
+        default_factory=dict,
+        description="Mapping of MoneyMoney account name to config account name",
+    )
 
 
 def load_config() -> AppConfig:
@@ -53,4 +61,6 @@ def load_config() -> AppConfig:
 
     return AppConfig(
         bank_accounts=data.get("bank_accounts", dict(DEFAULT_BANK_ACCOUNTS)),
+        bank_accounts_web=data.get("bank_accounts_web", {}),
+        mm_accounts=data.get("mm_accounts", {}),
     )

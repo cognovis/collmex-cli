@@ -7,12 +7,25 @@ Focused on Buchhaltung Pro use cases:
 - Buchungen (Accounting Documents)
 """
 
+import re
 from datetime import date
 from decimal import Decimal
 from enum import IntEnum
 from typing import Any, Self
 
 from pydantic import BaseModel, Field, field_validator
+
+
+def _parse_int(value: str, default: int = 0) -> int:
+    """Parse an int from a Collmex field that may contain trailing text.
+
+    The Collmex API sometimes returns compound values like "1 cognovís GmbH"
+    for integer fields. This extracts just the leading number.
+    """
+    if not value:
+        return default
+    m = re.match(r"^\s*(-?\d+)", value)
+    return int(m.group(1)) if m else default
 
 
 def parse_collmex_date(value: str) -> date | None:
@@ -124,8 +137,7 @@ class Vendor(CollmexRecord):
             return row[idx] if idx < len(row) else default
 
         def get_int(idx: int, default: int = 0) -> int:
-            val = get(idx)
-            return int(val) if val else default
+            return _parse_int(get(idx), default)
 
         return cls(
             record_type=get(0),
@@ -312,8 +324,7 @@ class OpenItem(CollmexRecord):
             return row[idx] if idx < len(row) else default
 
         def get_int(idx: int, default: int = 0) -> int:
-            val = get(idx)
-            return int(val) if val else default
+            return _parse_int(get(idx), default)
 
         return cls(
             record_type=get(0),
@@ -396,8 +407,7 @@ class AccountingDocument(CollmexRecord):
             return row[idx] if idx < len(row) else default
 
         def get_int(idx: int, default: int = 0) -> int:
-            val = get(idx)
-            return int(val) if val else default
+            return _parse_int(get(idx), default)
 
         return cls(
             record_type=get(0),

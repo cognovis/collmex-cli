@@ -32,7 +32,7 @@ class CollmexAPI:
     - Multipart form data POST requests
     """
 
-    ENCODING = "windows-1252"
+    ENCODING = "iso-8859-1"
     CSV_DELIMITER = ";"
 
     def __init__(self, config: CollmexConfig | None = None):
@@ -121,10 +121,11 @@ class CollmexAPI:
         all_rows = [self._build_login_row(), *rows]
         payload = self._encode_csv(all_rows)
 
-        # Send as multipart form data
+        # Send as raw POST with text/csv content type
         response = self.client.post(
             self.config.api_url,
-            files={"file": ("data.csv", payload, "text/csv")},
+            content=payload,
+            headers={"Content-Type": "text/csv"},
         )
         response.raise_for_status()
 
