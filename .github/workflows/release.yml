@@ -1,0 +1,50 @@
+name: Release to PyPI
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --dev
+      - run: uv run pytest
+
+  release:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Stamp version from tag
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          VERSION="${TAG_NAME#v}"
+          sed -i "s/0\.0\.0\.dev0/$VERSION/" pyproject.toml
+          sed -i "s/0\.0\.0\.dev0/$VERSION/" src/collmex_cli/__init__.py
+
+      - name: Build
+        run: uv build
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: gh release create "$TAG_NAME" dist/* --generate-notes
