@@ -7,6 +7,7 @@ from .config import CollmexConfig
 from .models import (
     AccountBalance,
     AccountingDocument,
+    Customer,
     Invoice,
     OpenItem,
     Vendor,
@@ -188,6 +189,49 @@ class CollmexClient:
         intersection = tokens1 & tokens2
         union = tokens1 | tokens2
         return len(intersection) / len(union)
+
+    # =========================================================================
+    # Customers (Kunden)
+    # =========================================================================
+
+    def get_customers(
+        self,
+        customer_id: int | None = None,
+        text: str | None = None,
+        only_changed: bool = False,
+    ) -> list[Customer]:
+        """Get customers from Collmex.
+
+        Args:
+            customer_id: Filter by specific customer ID
+            text: Search text
+            only_changed: Only return changed records since last query
+
+        Returns:
+            List of Customer objects
+        """
+        row = ["CUSTOMER_GET"]
+        row.append(str(customer_id) if customer_id else "")
+        row.append(str(self.api.config.company_id))
+        row.append(text or "")
+        row.append("")  # due date (unused)
+        row.append("")  # postal code
+        row.append("1" if only_changed else "")
+        row.append("")  # system name
+
+        results = self.api.request(row)
+        return [Customer.from_csv_row(r) for r in results if r and r[0] == "CMXKND"]
+
+    def create_customer(self, customer: Customer) -> list[str]:
+        """Create or update a customer.
+
+        Args:
+            customer: Customer object to create/update
+
+        Returns:
+            Raw API response rows
+        """
+        return self.api.request(customer.to_csv_row())
 
     # =========================================================================
     # Vendor Invoices (Lieferantenrechnungen)

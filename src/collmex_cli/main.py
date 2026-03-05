@@ -15,7 +15,7 @@ from . import __version__
 from .api import CollmexAuthError, CollmexError
 from .app_config import load_config
 from .client import CollmexClient
-from .models import AccountBalance, Invoice, Vendor, VendorInvoice
+from .models import AccountBalance, Customer, Invoice, Vendor, VendorInvoice
 
 
 def check_for_update() -> None:
@@ -194,6 +194,77 @@ def match_vendor(
                     console.print(f"  [{c['score']}] ID {c['vendor_id']}: {c['name']}")
             else:
                 console.print("[red]No match found[/red]")
+    except Exception as e:
+        handle_error(e)
+
+
+# =============================================================================
+# Customer Commands
+# =============================================================================
+
+
+@app.command("customers")
+def list_customers(
+    customer_id: Annotated[int | None, typer.Option("--id", help="Filter by customer ID")] = None,
+    search: Annotated[str | None, typer.Option("--search", "-s", help="Search text")] = None,
+    json_output: Annotated[bool, typer.Option("--json", "-j", help="Output as JSON")] = False,
+) -> None:
+    """List customers (Kunden)."""
+    try:
+        with CollmexClient() as client:
+            customers = client.get_customers(customer_id=customer_id, text=search)
+
+        if json_output:
+            output_json([c.model_dump() for c in customers])
+        else:
+            rows = [
+                [c.customer_id, c.company_name or f"{c.first_name} {c.last_name}".strip(), c.city, c.email]
+                for c in customers
+            ]
+            output_table("Customers", ["ID", "Name", "City", "Email"], rows)
+            console.print(f"\n[dim]Total: {len(customers)} customers[/dim]")
+    except Exception as e:
+        handle_error(e)
+
+
+@app.command("customer-create")
+def create_customer(
+    customer_id: Annotated[int | None, typer.Option("--id", help="Customer ID (for updating existing customer)")] = None,
+    company_name: Annotated[str | None, typer.Option("--company-name", "-c", help="Company name")] = None,
+    first_name: Annotated[str | None, typer.Option("--first-name", help="First name")] = None,
+    last_name: Annotated[str | None, typer.Option("--last-name", help="Last name")] = None,
+    street: Annotated[str | None, typer.Option("--street", help="Street address")] = None,
+    zip_code: Annotated[str | None, typer.Option("--zip-code", help="Postal code")] = None,
+    city: Annotated[str | None, typer.Option("--city", help="City")] = None,
+    country: Annotated[str, typer.Option("--country", help="Country code")] = "DE",
+    email: Annotated[str | None, typer.Option("--email", help="Email address")] = None,
+    vat_id: Annotated[str | None, typer.Option("--vat-id", help="VAT ID (USt-IdNr)")] = None,
+    json_output: Annotated[bool, typer.Option("--json", "-j", help="Output as JSON")] = False,
+) -> None:
+    """Create a new customer (Kunde). If --id is given, updates the existing customer."""
+    try:
+        customer = Customer(
+            customer_id=customer_id,
+            company_name=company_name or "",
+            first_name=first_name or "",
+            last_name=last_name or "",
+            street=street or "",
+            zip_code=zip_code or "",
+            city=city or "",
+            country=country,
+            email=email or "",
+            vat_id=vat_id or "",
+        )
+
+        with CollmexClient() as client:
+            result = client.create_customer(customer)
+
+        action = "updated" if customer_id else "created"
+        if json_output:
+            output_json({"status": action, "response": result})
+        else:
+            console.print(f"[green]Customer {action} successfully[/green]")
+            console.print(f"Response: {result}")
     except Exception as e:
         handle_error(e)
 

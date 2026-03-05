@@ -207,6 +207,209 @@ class Vendor(CollmexRecord):
 
 
 # =============================================================================
+# Customer (Kunde) - CMXKND
+# =============================================================================
+
+
+class Customer(CollmexRecord):
+    """Collmex customer record (CMXKND).
+
+    Field order matches official Collmex API spec (Satzbeschreibung Kunde).
+    Used to create or update customers in Collmex.
+    """
+
+    # Fields 1-12: Identity & address
+    record_type: str = Field(default="CMXKND", description="Record type identifier")
+    customer_id: int | None = Field(default=None, description="Customer number (auto-assigned if empty)")
+    company_id: int = Field(default=1, description="Company ID (Firma Nr)")
+    salutation: str = Field(default="", description="Salutation (Anrede)")
+    title: str = Field(default="", description="Title (Titel)")
+    first_name: str = Field(default="", description="First name (Vorname)")
+    last_name: str = Field(default="", description="Last name (Name)")
+    company_name: str = Field(default="", description="Company/firm name (Firma)")
+    department: str = Field(default="", description="Department (Abteilung)")
+    street: str = Field(default="", description="Street address (Straße)")
+    zip_code: str = Field(default="", description="Postal code (PLZ)")
+    city: str = Field(default="", description="City (Ort)")
+    # Fields 13-15: Notes, status, country
+    notes: str = Field(default="", description="Notes/remarks (Bemerkung)")
+    inactive: int = Field(default=0, description="0=active, 1=inactive, 2/3=delete (Inaktiv)")
+    country: str = Field(default="DE", description="Country code ISO 2-letter (Land)")
+    # Fields 16-18: Contact
+    phone: str = Field(default="", description="Phone number (Telefon)")
+    fax: str = Field(default="", description="Fax number (Telefax)")
+    email: str = Field(default="", description="Email address (E-Mail)")
+    # Fields 19-23: Banking
+    bank_account: str = Field(default="", description="Bank account number (Kontonummer)")
+    bank_code: str = Field(default="", description="Bank code BLZ (Blz)")
+    iban: str = Field(default="", description="IBAN")
+    bic: str = Field(default="", description="BIC/SWIFT code")
+    bank_name: str = Field(default="", description="Bank name (Bankname)")
+    # Field 24: Reserved (Reserviert) — not stored
+    # Field 25: VAT ID
+    vat_id: str = Field(default="", description="VAT ID (USt.IdNr)")
+    # Fields 26-30: Conditions & output
+    payment_condition: int = Field(default=0, description="Payment condition code (Zahlungsbedingung)")
+    discount_group: int = Field(default=0, description="Discount group (Rabattgruppe)")
+    delivery_condition: str = Field(default="", description="Delivery condition INCOTERMS (Lieferbedingung)")
+    delivery_condition_extra: str = Field(default="", description="Delivery condition addendum (Lieferbedingung Zusatz)")
+    output_medium: int = Field(default=0, description="Output medium: 0=Druck, 1=E-Mail, 2=Fax, 3=Brief, 100=keine (Ausgabemedium)")
+    # Fields 31-36: Account & grouping
+    bank_owner: str = Field(default="", description="Bank account holder if different (Kontoinhaber)")
+    address_group: str = Field(default="", description="Address group with optional note (Adressgruppe)")
+    ebay_name: str = Field(default="", description="eBay member name (eBay-Mitgliedsname)")
+    price_group: int = Field(default=0, description="Price group (Preisgruppe)")
+    currency: str = Field(default="EUR", description="Currency ISO code (Währung)")
+    agent: int = Field(default=0, description="Agent/broker employee number (Vermittler)")
+    # Fields 37-41: Misc
+    cost_center: str = Field(default="", description="Cost center (Kostenstelle)")
+    followup_date: str = Field(default="", description="Follow-up date YYYYMMDD (Wiedervorlage am)")
+    delivery_block: int = Field(default=0, description="1=delivery blocked (Liefersperre)")
+    construction_service: int = Field(default=0, description="1=Bau/Reinigungs-Dienstleister")
+    supplier_number_at_customer: str = Field(default="", description="Own supplier number at customer (Lief-Nr. bei Kunde)")
+    # Fields 42-50: More contact & options
+    output_language: int = Field(default=0, description="Output language: 0=Deutsch, 1=Englisch (Ausgabesprache)")
+    cc_email: str = Field(default="", description="CC email address (CC)")
+    phone2: str = Field(default="", description="Second phone number (Telefon2)")
+    direct_debit_mandate_ref: str = Field(default="", description="Direct debit mandate reference (Lastschrift-Mandatsreferenz)")
+    direct_debit_signature_date: str = Field(default="", description="Direct debit signature date YYYYMMDD (Datum Unterschrift)")
+    dunning_block: int = Field(default=0, description="1=dunning blocked (Mahnsperre)")
+    no_mailings: int = Field(default=0, description="1=no mailings (Keine Mailings)")
+    private_person: int = Field(default=0, description="1=private person (Privatperson)")
+    url: str = Field(default="", description="Website URL")
+    # Fields 51-54: Delivery/invoice options & meta
+    partial_deliveries: int = Field(default=0, description="1=partial deliveries allowed (Teil-Lieferungen erlaubt)")
+    partial_invoices: int = Field(default=0, description="1=partial invoices allowed (Teil-Rechnungen erlaubt)")
+    created_at: str = Field(default="", description="Creation date export-only (Angelegt am)")
+    invoice_format: int = Field(default=0, description="0=PDF+XML, 1=only XML, 2=only PDF (Rechnungsformat)")
+
+    @classmethod
+    def from_csv_row(cls, row: list[str]) -> "Customer":
+        """Create Customer from CSV row (official CMXKND field order)."""
+
+        def get(idx: int, default: str = "") -> str:
+            return row[idx] if idx < len(row) else default
+
+        def get_int(idx: int, default: int = 0) -> int:
+            return _parse_int(get(idx), default)
+
+        return cls(
+            record_type=get(0),
+            customer_id=get_int(1) or None,
+            company_id=get_int(2, 1),
+            salutation=get(3),
+            title=get(4),
+            first_name=get(5),
+            last_name=get(6),
+            company_name=get(7),
+            department=get(8),
+            street=get(9),
+            zip_code=get(10),
+            city=get(11),
+            notes=get(12),
+            inactive=get_int(13),
+            country=get(14) or "DE",
+            phone=get(15),
+            fax=get(16),
+            email=get(17),
+            bank_account=get(18),
+            bank_code=get(19),
+            iban=get(20),
+            bic=get(21),
+            bank_name=get(22),
+            # field 23 = Reserviert (skip)
+            vat_id=get(24),
+            payment_condition=get_int(25),
+            discount_group=get_int(26),
+            delivery_condition=get(27),
+            delivery_condition_extra=get(28),
+            output_medium=get_int(29),
+            bank_owner=get(30),
+            address_group=get(31),
+            ebay_name=get(32),
+            price_group=get_int(33),
+            currency=get(34) or "EUR",
+            agent=get_int(35),
+            cost_center=get(36),
+            followup_date=get(37),
+            delivery_block=get_int(38),
+            construction_service=get_int(39),
+            supplier_number_at_customer=get(40),
+            output_language=get_int(41),
+            cc_email=get(42),
+            phone2=get(43),
+            direct_debit_mandate_ref=get(44),
+            direct_debit_signature_date=get(45),
+            dunning_block=get_int(46),
+            no_mailings=get_int(47),
+            private_person=get_int(48),
+            url=get(49),
+            partial_deliveries=get_int(50),
+            partial_invoices=get_int(51),
+            created_at=get(52),
+            invoice_format=get_int(53),
+        )
+
+    def to_csv_row(self) -> list[str]:
+        """Convert to CSV row for creating/updating customer (official CMXKND field order)."""
+        return [
+            self.record_type,                                              # 1
+            str(self.customer_id) if self.customer_id else "",            # 2
+            str(self.company_id),                                          # 3
+            self.salutation,                                               # 4
+            self.title,                                                    # 5
+            self.first_name,                                               # 6
+            self.last_name,                                                # 7
+            self.company_name,                                             # 8
+            self.department,                                               # 9
+            self.street,                                                   # 10
+            self.zip_code,                                                 # 11
+            self.city,                                                     # 12
+            self.notes,                                                    # 13
+            str(self.inactive),                                            # 14
+            self.country,                                                  # 15
+            self.phone,                                                    # 16
+            self.fax,                                                      # 17
+            self.email,                                                    # 18
+            self.bank_account,                                             # 19
+            self.bank_code,                                                # 20
+            self.iban,                                                     # 21
+            self.bic,                                                      # 22
+            self.bank_name,                                                # 23
+            "",                                                            # 24 Reserviert
+            self.vat_id,                                                   # 25
+            str(self.payment_condition),                                   # 26
+            str(self.discount_group),                                      # 27
+            self.delivery_condition,                                       # 28
+            self.delivery_condition_extra,                                 # 29
+            str(self.output_medium),                                       # 30
+            self.bank_owner,                                               # 31
+            self.address_group,                                            # 32
+            self.ebay_name,                                                # 33
+            str(self.price_group),                                         # 34
+            self.currency,                                                 # 35
+            str(self.agent),                                               # 36
+            self.cost_center,                                              # 37
+            self.followup_date,                                            # 38
+            str(self.delivery_block),                                      # 39
+            str(self.construction_service),                                # 40
+            self.supplier_number_at_customer,                              # 41
+            str(self.output_language),                                     # 42
+            self.cc_email,                                                 # 43
+            self.phone2,                                                   # 44
+            self.direct_debit_mandate_ref,                                 # 45
+            self.direct_debit_signature_date,                              # 46
+            str(self.dunning_block),                                       # 47
+            str(self.no_mailings),                                         # 48
+            str(self.private_person),                                      # 49
+            self.url,                                                      # 50
+            str(self.partial_deliveries),                                  # 51
+            str(self.partial_invoices),                                    # 52
+            # 53 (created_at) is export-only, omit on write
+        ]
+
+
+# =============================================================================
 # Vendor Invoice (Lieferantenrechnung) - CMXLRN
 # =============================================================================
 
@@ -494,6 +697,7 @@ class AccountBalance(CollmexRecord):
 
 RECORD_TYPES: dict[str, type[CollmexRecord]] = {
     "CMXLIF": Vendor,
+    "CMXKND": Customer,
     "OPEN_ITEM": OpenItem,
     "ACCDOC": AccountingDocument,
     "ACC_BAL": AccountBalance,
