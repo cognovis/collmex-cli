@@ -1,3 +1,9 @@
+## [2026.03.4] - 2026-03-05
+
+### 🚀 Features
+
+- *(customer)* Add customer management: CUSTOMER_GET + CMXKND with full 54-field model per official API spec, `customers` list command, `customer-create` command with `--id` (update) and `--vat-id` options
+
 ## [2026.03.3] - 2026-03-05
 
 ### 🚀 Features
