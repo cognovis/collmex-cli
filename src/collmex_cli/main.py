@@ -323,16 +323,13 @@ def list_balances(
                 [
                     b.account_number,
                     b.account_name,
-                    b.fiscal_year,
-                    b.opening_balance,
                     b.balance,
-                    b.turnover,
                 ]
                 for b in balances
             ]
             output_table(
                 "Account Balances",
-                ["Account", "Name", "Year", "Opening", "Balance", "Turnover"],
+                ["Account", "Name", "Balance"],
                 rows,
             )
             console.print(f"\n[dim]Total: {len(balances)} accounts[/dim]")

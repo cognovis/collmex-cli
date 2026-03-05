@@ -18,65 +18,61 @@ runner = CliRunner()
 
 
 class TestAccountBalanceModel:
-    """Tests for AccountBalance.from_csv_row() parsing."""
+    """Tests for AccountBalance.from_csv_row() parsing.
+
+    Real API response format: ['ACC_BAL', account_number, account_name, balance]
+    """
 
     def test_balance_model_full_row(self):
-        """Parse a complete ACC_BAL row with all fields."""
-        row = ["ACC_BAL", "1", "2026", "1200", "Bank", "1000,00", "500,50", "250,25"]
+        """Parse a complete ACC_BAL row."""
+        row = ["ACC_BAL", "1200", "Bank", "5000,94"]
         bal = AccountBalance.from_csv_row(row)
 
         assert bal.record_type == "ACC_BAL"
-        assert bal.company_id == 1
-        assert bal.fiscal_year == 2026
         assert bal.account_number == 1200
         assert bal.account_name == "Bank"
-        assert bal.opening_balance == Decimal("1000.00")
-        assert bal.balance == Decimal("500.50")
-        assert bal.turnover == Decimal("250.25")
-
-    def test_balance_model_missing_turnover(self):
-        """Parse a row where turnover field is missing (optional)."""
-        row = ["ACC_BAL", "1", "2026", "4000", "Erloese", "0,00", "2500,00"]
-        bal = AccountBalance.from_csv_row(row)
-
-        assert bal.account_number == 4000
-        assert bal.balance == Decimal("2500.00")
-        assert bal.turnover is None
-
-    def test_balance_model_empty_turnover(self):
-        """Parse a row where turnover field is empty string."""
-        row = ["ACC_BAL", "1", "2026", "3200", "Vorsteuer", "100,00", "99,99", ""]
-        bal = AccountBalance.from_csv_row(row)
-
-        assert bal.balance == Decimal("99.99")
-        assert bal.turnover is None
+        assert bal.balance == Decimal("5000.94")
 
     def test_balance_model_negative_balance(self):
         """Parse a row with negative balance (credit account)."""
-        row = ["ACC_BAL", "1", "2026", "1600", "Verbindlichkeiten", "0,00", "-3500,00", ""]
+        row = ["ACC_BAL", "1600", "Verbindlichkeiten", "-3500,00"]
         bal = AccountBalance.from_csv_row(row)
 
+        assert bal.account_number == 1600
+        assert bal.account_name == "Verbindlichkeiten"
         assert bal.balance == Decimal("-3500.00")
 
-    def test_balance_model_zero_values(self):
-        """Parse a row with zero balances."""
-        row = ["ACC_BAL", "1", "2026", "9999", "Konto", "0,00", "0,00", "0,00"]
+    def test_balance_model_zero_balance(self):
+        """Parse a row with zero balance."""
+        row = ["ACC_BAL", "9999", "Nullkonto", "0,00"]
         bal = AccountBalance.from_csv_row(row)
 
-        assert bal.opening_balance == Decimal("0.00")
         assert bal.balance == Decimal("0.00")
-        assert bal.turnover == Decimal("0.00")
 
-    def test_balance_model_defaults_for_missing_fields(self):
-        """Minimal row with only required fields."""
-        row = ["ACC_BAL", "1", "2026", "1200"]
+    def test_balance_model_missing_balance(self):
+        """Parse a row where balance field is missing."""
+        row = ["ACC_BAL", "1200", "Bank"]
+        bal = AccountBalance.from_csv_row(row)
+
+        assert bal.account_number == 1200
+        assert bal.account_name == "Bank"
+        assert bal.balance is None
+
+    def test_balance_model_minimal_row(self):
+        """Parse a row with only record type and account number."""
+        row = ["ACC_BAL", "1200"]
         bal = AccountBalance.from_csv_row(row)
 
         assert bal.account_number == 1200
         assert bal.account_name == ""
-        assert bal.opening_balance is None
         assert bal.balance is None
-        assert bal.turnover is None
+
+    def test_balance_model_decimal_with_comma(self):
+        """German comma decimal separator is parsed correctly."""
+        row = ["ACC_BAL", "320", "Pkw", "65764,94"]
+        bal = AccountBalance.from_csv_row(row)
+
+        assert bal.balance == Decimal("65764.94")
 
 
 # =============================================================================
@@ -93,8 +89,8 @@ class TestAccbalGet:
         mock_api = mock_api_cls.return_value
         mock_api.config.company_id = 1
         mock_api.request.return_value = [
-            ["ACC_BAL", "1", "2026", "1200", "Bank", "0,00", "5000,00", ""],
-            ["ACC_BAL", "1", "2026", "4000", "Erloese", "0,00", "12000,00", "12000,00"],
+            ["ACC_BAL", "1200", "Bank", "5000,00"],
+            ["ACC_BAL", "4000", "Erloese", "12000,00"],
         ]
 
         client = CollmexClient.__new__(CollmexClient)
@@ -127,7 +123,7 @@ class TestAccbalGet:
 
     @patch("collmex_cli.client.CollmexAPI")
     def test_accbal_get_no_filters(self, mock_api_cls):
-        """get_account_balances() without filters sends empty strings for optional params."""
+        """get_account_balances() without filters sends ACCBAL_GET."""
         mock_api = mock_api_cls.return_value
         mock_api.config.company_id = 1
         mock_api.request.return_value = []
@@ -147,7 +143,7 @@ class TestAccbalGet:
         mock_api.config.company_id = 1
         mock_api.request.return_value = [
             ["MESSAGE", "0", ""],
-            ["ACC_BAL", "1", "2026", "1200", "Bank", "0,00", "5000,00", ""],
+            ["ACC_BAL", "1200", "Bank", "5000,00"],
             ["OTHER", "data"],
         ]
 
@@ -218,7 +214,7 @@ class TestBalanceFilters:
         mock_api = mock_api_cls.return_value
         mock_api.config.company_id = 1
         mock_api.request.return_value = [
-            ["ACC_BAL", "1", "2026", "3200", "Vorsteuer", "0,00", "800,00", ""],
+            ["ACC_BAL", "3200", "Vorsteuer", "800,00"],
         ]
 
         client = CollmexClient.__new__(CollmexClient)
@@ -248,13 +244,9 @@ class TestBalancesCli:
         instance.get_account_balances.return_value = [
             AccountBalance(
                 record_type="ACC_BAL",
-                company_id=1,
-                fiscal_year=2026,
                 account_number=1200,
                 account_name="Bank",
-                opening_balance=Decimal("0.00"),
                 balance=Decimal("5000.00"),
-                turnover=None,
             ),
         ]
 
@@ -274,13 +266,9 @@ class TestBalancesCli:
         instance.get_account_balances.return_value = [
             AccountBalance(
                 record_type="ACC_BAL",
-                company_id=1,
-                fiscal_year=2026,
                 account_number=1200,
                 account_name="Bank",
-                opening_balance=Decimal("0.00"),
                 balance=Decimal("5000.00"),
-                turnover=None,
             ),
         ]
 
@@ -320,7 +308,7 @@ class TestBalancesCli:
 
     @patch("collmex_cli.main.CollmexClient", autospec=True)
     def test_balances_empty_result(self, mock_client_cls):
-        """balances with no results shows appropriate message."""
+        """balances with no results shows total count."""
         instance = mock_client_cls.return_value.__enter__.return_value
         instance.get_account_balances.return_value = []
 
@@ -338,16 +326,12 @@ class TestBalancesCli:
         instance.get_account_balances.return_value = [
             AccountBalance(
                 record_type="ACC_BAL",
-                company_id=1,
-                fiscal_year=2026,
                 account_number=1200,
                 account_name="Bank",
                 balance=Decimal("5000.00"),
             ),
             AccountBalance(
                 record_type="ACC_BAL",
-                company_id=1,
-                fiscal_year=2026,
                 account_number=4000,
                 account_name="Erloese",
                 balance=Decimal("12000.00"),
