@@ -105,7 +105,7 @@ class TestAccbalGet:
 
     @patch("collmex_cli.client.CollmexAPI")
     def test_accbal_get_request_row(self, mock_api_cls):
-        """get_account_balances() sends correct ACCBAL_GET request row."""
+        """get_account_balances() sends correct ACCBAL_GET request row with official field order."""
         mock_api = mock_api_cls.return_value
         mock_api.config.company_id = 1
         mock_api.request.return_value = []
@@ -117,9 +117,12 @@ class TestAccbalGet:
 
         call_args = mock_api.request.call_args[0][0]
         assert call_args[0] == "ACCBAL_GET"
-        assert "1" in call_args  # company_id
-        assert "2026" in call_args
-        assert "1200" in call_args
+        assert call_args[1] == "1"       # pos 2: Firma Nr
+        assert call_args[2] == "2026"    # pos 3: Geschäftsjahr
+        assert call_args[3] == ""        # pos 4: Datum bis (empty)
+        assert call_args[4] == "1200"    # pos 5: Kontonummer
+        assert call_args[5] == ""        # pos 6: Kontengruppe (empty)
+        assert len(call_args) == 9       # all 9 fields present
 
     @patch("collmex_cli.client.CollmexAPI")
     def test_accbal_get_no_filters(self, mock_api_cls):
@@ -290,7 +293,13 @@ class TestBalancesCli:
 
         assert result.exit_code == 0
         instance.get_account_balances.assert_called_once_with(
-            fiscal_year=None, account_number=1200
+            fiscal_year=None,
+            date_to=None,
+            account_number=1200,
+            account_group=None,
+            customer_id=None,
+            vendor_id=None,
+            cost_center=None,
         )
 
     @patch("collmex_cli.main.CollmexClient", autospec=True)
@@ -303,7 +312,13 @@ class TestBalancesCli:
 
         assert result.exit_code == 0
         instance.get_account_balances.assert_called_once_with(
-            fiscal_year=2025, account_number=None
+            fiscal_year=2025,
+            date_to=None,
+            account_number=None,
+            account_group=None,
+            customer_id=None,
+            vendor_id=None,
+            cost_center=None,
         )
 
     @patch("collmex_cli.main.CollmexClient", autospec=True)

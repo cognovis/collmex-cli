@@ -342,21 +342,53 @@ class CollmexClient:
     def get_account_balances(
         self,
         fiscal_year: int | None = None,
+        date_to: date | None = None,
         account_number: int | None = None,
+        account_group: int | None = None,
+        customer_id: int | None = None,
+        vendor_id: int | None = None,
+        cost_center: str | None = None,
     ) -> list[AccountBalance]:
         """Get account balances (Kontosalden) via ACCBAL_GET.
 
+        Official API fields (positional):
+        1. Satzart         = ACCBAL_GET
+        2. Firma Nr        = company_id (required)
+        3. Geschäftsjahr   = fiscal_year (optional)
+        4. Datum bis       = date_to (optional; ignored when customer_id/vendor_id set)
+        5. Kontonummer     = account_number (optional)
+        6. Kontengruppe    = account_group (optional)
+           1=Sonstiges, 2=Anlagevermögen, 3=Finanzkonten, 4=Einnahmen,
+           5=Ausgaben, 6=Umsatzsteuer, 7=Vorsteuer, 8=Forderungen,
+           9=Verbindlichkeiten, 10=Abschreibungen, 11=Rückstellungen,
+           12=Bestand, 13=Privat, 14=Nicht abziehbare Ausgaben
+        7. Kunde Nr        = customer_id (optional; disables Datum bis)
+        8. Lieferant Nr    = vendor_id (optional; disables Datum bis)
+        9. Kostenstelle    = cost_center (optional)
+
         Args:
             fiscal_year: Filter by fiscal year (e.g. 2026)
+            date_to: Balance as of this date (optional; ignored when customer_id/vendor_id set)
             account_number: Filter by specific account number
+            account_group: Filter by account group (1-14)
+            customer_id: Filter by customer ID
+            vendor_id: Filter by vendor/supplier ID
+            cost_center: Filter by cost center
 
         Returns:
             List of AccountBalance objects
         """
-        row = ["ACCBAL_GET"]
-        row.append(str(self.api.config.company_id))
-        row.append(str(fiscal_year) if fiscal_year else "")
-        row.append(str(account_number) if account_number else "")
+        row = [
+            "ACCBAL_GET",
+            str(self.api.config.company_id),                   # 2: Firma Nr
+            str(fiscal_year) if fiscal_year else "",            # 3: Geschäftsjahr
+            format_collmex_date(date_to) if date_to else "",   # 4: Datum bis
+            str(account_number) if account_number else "",      # 5: Kontonummer
+            str(account_group) if account_group else "",        # 6: Kontengruppe
+            str(customer_id) if customer_id else "",            # 7: Kunde Nr
+            str(vendor_id) if vendor_id else "",                # 8: Lieferant Nr
+            cost_center or "",                                  # 9: Kostenstelle
+        ]
 
         results = self.api.request(row)
         return [AccountBalance.from_csv_row(r) for r in results if r and r[0] == "ACC_BAL"]

@@ -306,14 +306,34 @@ def list_bookings(
 def list_balances(
     account: Annotated[int | None, typer.Option("--account", "-a", help="Filter by account number")] = None,
     year: Annotated[int | None, typer.Option("--year", "-y", help="Fiscal year")] = None,
+    date_to: Annotated[str | None, typer.Option("--date-to", help="Balance as of date (YYYY-MM-DD)")] = None,
+    group: Annotated[int | None, typer.Option("--group", "-g", help="Account group (1=Sonstiges, 2=Anlagevermögen, 3=Finanzkonten, 4=Einnahmen, 5=Ausgaben, 6=USt, 7=Vorsteuer, 8=Forderungen, 9=Verbindlichkeiten, ...)")] = None,
+    customer: Annotated[int | None, typer.Option("--customer", help="Filter by customer ID")] = None,
+    vendor: Annotated[int | None, typer.Option("--vendor", help="Filter by vendor ID")] = None,
+    cost_center: Annotated[str | None, typer.Option("--cost-center", help="Filter by cost center")] = None,
     json_output: Annotated[bool, typer.Option("--json", "-j", help="Output as JSON")] = False,
 ) -> None:
     """List account balances (Kontosalden) via ACCBAL_GET."""
+    from datetime import date as date_type
+
+    parsed_date_to: date_type | None = None
+    if date_to:
+        try:
+            parsed_date_to = date_type.fromisoformat(date_to)
+        except ValueError:
+            err_console.print(f"[red]Invalid date format: {date_to!r} — use YYYY-MM-DD[/red]")
+            raise typer.Exit(1)
+
     try:
         with CollmexClient() as client:
             balances = client.get_account_balances(
                 fiscal_year=year,
+                date_to=parsed_date_to,
                 account_number=account,
+                account_group=group,
+                customer_id=customer,
+                vendor_id=vendor,
+                cost_center=cost_center,
             )
 
         if json_output:
