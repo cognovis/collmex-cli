@@ -15,7 +15,7 @@ from . import __version__
 from .api import CollmexAuthError, CollmexError
 from .app_config import load_config
 from .client import CollmexClient
-from .models import Vendor, VendorInvoice
+from .models import AccountBalance, Vendor, VendorInvoice
 
 
 def check_for_update() -> None:
@@ -298,6 +298,44 @@ def list_bookings(
                 rows,
             )
             console.print(f"\n[dim]Total: {len(bookings)} bookings[/dim]")
+    except Exception as e:
+        handle_error(e)
+
+
+@app.command("balances")
+def list_balances(
+    account: Annotated[int | None, typer.Option("--account", "-a", help="Filter by account number")] = None,
+    year: Annotated[int | None, typer.Option("--year", "-y", help="Fiscal year")] = None,
+    json_output: Annotated[bool, typer.Option("--json", "-j", help="Output as JSON")] = False,
+) -> None:
+    """List account balances (Kontosalden) via ACCBAL_GET."""
+    try:
+        with CollmexClient() as client:
+            balances = client.get_account_balances(
+                fiscal_year=year,
+                account_number=account,
+            )
+
+        if json_output:
+            output_json([b.model_dump() for b in balances])
+        else:
+            rows = [
+                [
+                    b.account_number,
+                    b.account_name,
+                    b.fiscal_year,
+                    b.opening_balance,
+                    b.balance,
+                    b.turnover,
+                ]
+                for b in balances
+            ]
+            output_table(
+                "Account Balances",
+                ["Account", "Name", "Year", "Opening", "Balance", "Turnover"],
+                rows,
+            )
+            console.print(f"\n[dim]Total: {len(balances)} accounts[/dim]")
     except Exception as e:
         handle_error(e)
 

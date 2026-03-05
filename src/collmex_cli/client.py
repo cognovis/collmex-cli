@@ -5,6 +5,7 @@ from datetime import date
 from .api import CollmexAPI
 from .config import CollmexConfig
 from .models import (
+    AccountBalance,
     AccountingDocument,
     OpenItem,
     Vendor,
@@ -333,6 +334,32 @@ class CollmexClient:
             "last_date": last_date,
             "booking_count": len(bookings),
         }
+
+    # =========================================================================
+    # Account Balances (Kontosalden)
+    # =========================================================================
+
+    def get_account_balances(
+        self,
+        fiscal_year: int | None = None,
+        account_number: int | None = None,
+    ) -> list[AccountBalance]:
+        """Get account balances (Kontosalden) via ACCBAL_GET.
+
+        Args:
+            fiscal_year: Filter by fiscal year (e.g. 2026)
+            account_number: Filter by specific account number
+
+        Returns:
+            List of AccountBalance objects
+        """
+        row = ["ACCBAL_GET"]
+        row.append(str(self.api.config.company_id))
+        row.append(str(fiscal_year) if fiscal_year else "")
+        row.append(str(account_number) if account_number else "")
+
+        results = self.api.request(row)
+        return [AccountBalance.from_csv_row(r) for r in results if r and r[0] == "ACC_BAL"]
 
     def get_unmatched_bank_transactions(
         self,

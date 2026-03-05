@@ -442,6 +442,66 @@ class AccountingDocument(CollmexRecord):
 
 
 # =============================================================================
+# Account Balance (Kontosaldo) - ACC_BAL
+# =============================================================================
+
+
+class AccountBalance(CollmexRecord):
+    """Collmex account balance record (ACC_BAL).
+
+    Returned by ACCBAL_GET queries. Represents the balance of a single
+    account for a given fiscal year.
+    """
+
+    record_type: str = Field(default="ACC_BAL", description="Record type identifier")
+    company_id: int = Field(default=1, description="Company ID")
+    fiscal_year: int = Field(default=0, description="Fiscal year")
+    account_number: int = Field(default=0, description="Account number")
+    account_name: str = Field(default="", description="Account name")
+    opening_balance: Decimal | None = Field(
+        default=None, description="Opening balance (Eroeffnungsbilanzwert)"
+    )
+    balance: Decimal | None = Field(default=None, description="Current balance (Saldo)")
+    turnover: Decimal | None = Field(
+        default=None, description="Turnover (Umsatz), optional"
+    )
+
+    @classmethod
+    def from_csv_row(cls, row: list[str]) -> "AccountBalance":
+        """Create AccountBalance from CSV row, handling missing optional fields."""
+
+        def get(idx: int, default: str = "") -> str:
+            return row[idx] if idx < len(row) else default
+
+        def get_int(idx: int, default: int = 0) -> int:
+            return _parse_int(get(idx), default)
+
+        return cls(
+            record_type=get(0),
+            company_id=get_int(1, 1),
+            fiscal_year=get_int(2),
+            account_number=get_int(3),
+            account_name=get(4),
+            opening_balance=parse_collmex_decimal(get(5)),
+            balance=parse_collmex_decimal(get(6)),
+            turnover=parse_collmex_decimal(get(7)),
+        )
+
+    def to_csv_row(self) -> list[str]:
+        """Convert to CSV row (ACC_BAL is a read response type)."""
+        return [
+            self.record_type,
+            str(self.company_id),
+            str(self.fiscal_year),
+            str(self.account_number),
+            self.account_name,
+            format_collmex_decimal(self.opening_balance),
+            format_collmex_decimal(self.balance),
+            format_collmex_decimal(self.turnover),
+        ]
+
+
+# =============================================================================
 # Record type mapping
 # =============================================================================
 
@@ -449,6 +509,7 @@ RECORD_TYPES: dict[str, type[CollmexRecord]] = {
     "CMXLIF": Vendor,
     "OPEN_ITEM": OpenItem,
     "ACCDOC": AccountingDocument,
+    "ACC_BAL": AccountBalance,
 }
 
 
