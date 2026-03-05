@@ -442,6 +442,53 @@ class AccountingDocument(CollmexRecord):
 
 
 # =============================================================================
+# Account Balance (Kontosaldo) - ACC_BAL
+# =============================================================================
+
+
+class AccountBalance(CollmexRecord):
+    """Collmex account balance record (ACC_BAL).
+
+    Returned by ACCBAL_GET queries. Real API response format:
+    ACC_BAL;<account_number>;<account_name>;<balance>
+
+    Four fields only — no company_id, fiscal_year, opening_balance, or turnover
+    in the actual response.
+    """
+
+    record_type: str = Field(default="ACC_BAL", description="Record type identifier")
+    account_number: int = Field(default=0, description="Account number (Kontonummer)")
+    account_name: str = Field(default="", description="Account name (Kontobezeichnung)")
+    balance: Decimal | None = Field(default=None, description="Current balance (Saldo)")
+
+    @classmethod
+    def from_csv_row(cls, row: list[str]) -> "AccountBalance":
+        """Create AccountBalance from CSV row.
+
+        Real format: ['ACC_BAL', account_number, account_name, balance]
+        """
+
+        def get(idx: int, default: str = "") -> str:
+            return row[idx] if idx < len(row) else default
+
+        return cls(
+            record_type=get(0),
+            account_number=_parse_int(get(1)),
+            account_name=get(2),
+            balance=parse_collmex_decimal(get(3)),
+        )
+
+    def to_csv_row(self) -> list[str]:
+        """Convert to CSV row (ACC_BAL is a read response type)."""
+        return [
+            self.record_type,
+            str(self.account_number),
+            self.account_name,
+            format_collmex_decimal(self.balance),
+        ]
+
+
+# =============================================================================
 # Record type mapping
 # =============================================================================
 
@@ -449,6 +496,7 @@ RECORD_TYPES: dict[str, type[CollmexRecord]] = {
     "CMXLIF": Vendor,
     "OPEN_ITEM": OpenItem,
     "ACCDOC": AccountingDocument,
+    "ACC_BAL": AccountBalance,
 }
 
 
