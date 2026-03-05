@@ -1,3 +1,9 @@
+## [2026.03.7] - 2026-03-05
+
+### 🐛 Bug Fixes
+
+- *(vendor-update)* Add --country flag (ISO 2-letter) with overwrite warning when country changes
+
 ## [2026.03.4] - 2026-03-05
 
 ### 🚀 Features
