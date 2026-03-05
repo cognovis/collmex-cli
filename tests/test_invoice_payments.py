@@ -5,6 +5,17 @@ Covers:
 - CollmexClient.get_invoice_payments()
 - Filter parameters
 - CLI command 'invoice-payments'
+
+Real API response layout (verified against live Collmex API):
+  0: INVOICE_PAYMENT
+  1: invoice_number
+  2: payment_date (YYYYMMDD)
+  3: payment_amount (German decimal, e.g. "195,05")
+  4: invoice_amount (total invoice amount)
+  5: fiscal_year
+  6: booking_id
+  7: payment_type code
+  8: (unused / empty)
 """
 
 from datetime import date
@@ -27,26 +38,25 @@ runner = CliRunner()
 
 
 def _make_payment_row(
-    company_id: str = "1",
     invoice_number: str = "RE-2026-001",
-    customer_id: str = "10042",
-    customer_name: str = "ACME GmbH",
     payment_date: str = "20260115",
     payment_amount: str = "1190,00",
-    payment_method: str = "Überweisung",
+    invoice_amount: str = "1190,00",
+    fiscal_year: str = "2026",
     booking_id: str = "5001",
+    payment_type: str = "2",
 ) -> list[str]:
-    """Build a raw CSV row as returned by the Collmex API."""
+    """Build a raw CSV row as returned by the real Collmex API."""
     return [
         "INVOICE_PAYMENT",
-        company_id,
         invoice_number,
-        customer_id,
-        customer_name,
         payment_date,
         payment_amount,
-        payment_method,
+        invoice_amount,
+        fiscal_year,
         booking_id,
+        payment_type,
+        "",
     ]
 
 
@@ -54,14 +64,13 @@ def _make_payment(**kwargs) -> InvoicePayment:
     """Create an InvoicePayment with sensible defaults."""
     defaults = dict(
         record_type="INVOICE_PAYMENT",
-        company_id=1,
         invoice_number="RE-2026-001",
-        customer_id=10042,
-        customer_name="ACME GmbH",
         payment_date=date(2026, 1, 15),
         payment_amount=Decimal("1190.00"),
-        payment_method="Überweisung",
+        invoice_amount=Decimal("1190.00"),
+        fiscal_year=2026,
         booking_id=5001,
+        payment_type="2",
     )
     defaults.update(kwargs)
     return InvoicePayment(**defaults)
@@ -81,32 +90,33 @@ class TestInvoicePaymentModel:
         payment = InvoicePayment.from_csv_row(row)
 
         assert payment.record_type == "INVOICE_PAYMENT"
-        assert payment.company_id == 1
         assert payment.invoice_number == "RE-2026-001"
-        assert payment.customer_id == 10042
-        assert payment.customer_name == "ACME GmbH"
         assert payment.payment_date == date(2026, 1, 15)
         assert payment.payment_amount == Decimal("1190.00")
-        assert payment.payment_method == "Überweisung"
+        assert payment.invoice_amount == Decimal("1190.00")
+        assert payment.fiscal_year == 2026
         assert payment.booking_id == 5001
+        assert payment.payment_type == "2"
 
     def test_from_csv_row_german_decimal(self):
         """German comma decimal separator is parsed correctly."""
-        row = _make_payment_row(payment_amount="2499,99")
+        row = _make_payment_row(payment_amount="2499,99", invoice_amount="2499,99")
         payment = InvoicePayment.from_csv_row(row)
         assert payment.payment_amount == Decimal("2499.99")
+        assert payment.invoice_amount == Decimal("2499.99")
+
+    def test_from_csv_row_partial_payment(self):
+        """Partial payment: payment_amount differs from invoice_amount."""
+        row = _make_payment_row(payment_amount="195,05", invoice_amount="35,49")
+        payment = InvoicePayment.from_csv_row(row)
+        assert payment.payment_amount == Decimal("195.05")
+        assert payment.invoice_amount == Decimal("35.49")
 
     def test_from_csv_row_zero_amount(self):
         """Zero amount parses correctly."""
         row = _make_payment_row(payment_amount="0,00")
         payment = InvoicePayment.from_csv_row(row)
         assert payment.payment_amount == Decimal("0.00")
-
-    def test_from_csv_row_empty_payment_method(self):
-        """Empty payment_method is handled."""
-        row = _make_payment_row(payment_method="")
-        payment = InvoicePayment.from_csv_row(row)
-        assert payment.payment_method == ""
 
     def test_from_csv_row_date_validation(self):
         """payment_date field_validator accepts YYYYMMDD string."""
@@ -126,6 +136,12 @@ class TestInvoicePaymentModel:
         payment = InvoicePayment.from_csv_row(row)
         assert payment.payment_amount is None
 
+    def test_from_csv_row_strips_invoice_number(self):
+        """Leading/trailing whitespace in invoice_number is stripped."""
+        row = _make_payment_row(invoice_number=" 10-04610-56733")
+        payment = InvoicePayment.from_csv_row(row)
+        assert payment.invoice_number == "10-04610-56733"
+
     def test_field_validator_accepts_date_object(self):
         """field_validator accepts date objects directly (model construction)."""
         payment = _make_payment(payment_date=date(2026, 6, 1))
@@ -138,6 +154,7 @@ class TestInvoicePaymentModel:
         assert data["invoice_number"] == "RE-2026-001"
         assert data["payment_date"] == date(2026, 1, 15)
         assert isinstance(data["payment_amount"], Decimal)
+        assert data["fiscal_year"] == 2026
 
     def test_record_type_in_record_types_dict(self):
         """INVOICE_PAYMENT is registered in RECORD_TYPES."""
@@ -147,12 +164,12 @@ class TestInvoicePaymentModel:
 
     def test_from_csv_row_short_row_uses_defaults(self):
         """Short CSV row (missing trailing fields) doesn't raise."""
-        row = ["INVOICE_PAYMENT", "1", "RE-001"]
+        row = ["INVOICE_PAYMENT", "RE-001"]
         payment = InvoicePayment.from_csv_row(row)
         assert payment.invoice_number == "RE-001"
-        assert payment.customer_id is None
         assert payment.payment_date is None
         assert payment.payment_amount is None
+        assert payment.booking_id is None
 
 
 # =============================================================================
@@ -359,9 +376,7 @@ class TestInvoicePaymentsCLI:
         result = runner.invoke(app, ["invoice-payments"])
 
         assert result.exit_code == 0
-        # Rich may truncate long values in narrow terminals; check for partial match
         assert "RE-2026" in result.output
-        assert "ACME GmbH" in result.output
         assert "1190" in result.output
 
     @patch("collmex_cli.main.CollmexClient", autospec=True)
@@ -382,6 +397,7 @@ class TestInvoicePaymentsCLI:
         assert data[0]["invoice_number"] == "RE-2026-001"
         assert data[0]["payment_date"] == "2026-01-15"
         assert data[0]["payment_amount"] == "1190.00"
+        assert data[0]["fiscal_year"] == 2026
 
     @patch("collmex_cli.main.CollmexClient", autospec=True)
     def test_filter_invoice_number_passed_to_client(self, mock_client_cls):

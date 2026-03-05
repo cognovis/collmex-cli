@@ -451,17 +451,27 @@ class InvoicePayment(CollmexRecord):
 
     Represents a payment received for a customer invoice.
     Returned by INVOICE_PAYMENT_GET queries.
+
+    Real API response layout (verified against live API):
+      0: INVOICE_PAYMENT
+      1: invoice_number
+      2: payment_date (YYYYMMDD)
+      3: payment_amount (German decimal, e.g. "195,05")
+      4: invoice_amount (total invoice amount)
+      5: fiscal_year
+      6: booking_id
+      7: payment_type code
+      8: (unused / empty)
     """
 
     record_type: str = Field(default="INVOICE_PAYMENT", description="Record type identifier")
-    company_id: int = Field(default=1, description="Company ID")
     invoice_number: str = Field(default="", description="Invoice number")
-    customer_id: int | None = Field(default=None, description="Customer number")
-    customer_name: str = Field(default="", description="Customer name")
     payment_date: date | None = Field(default=None, description="Payment date")
     payment_amount: Decimal | None = Field(default=None, description="Payment amount")
-    payment_method: str = Field(default="", description="Payment method")
+    invoice_amount: Decimal | None = Field(default=None, description="Total invoice amount")
+    fiscal_year: int = Field(default=0, description="Fiscal year")
     booking_id: int | None = Field(default=None, description="Booking number")
+    payment_type: str = Field(default="", description="Payment type code")
 
     @field_validator("payment_date", mode="before")
     @classmethod
@@ -484,14 +494,13 @@ class InvoicePayment(CollmexRecord):
 
         return cls(
             record_type=get(0),
-            company_id=get_int(1, 1),
-            invoice_number=get(2),
-            customer_id=get_int(3) or None,
-            customer_name=get(4),
-            payment_date=get(5),
-            payment_amount=parse_collmex_decimal(get(6)),
-            payment_method=get(7),
-            booking_id=get_int(8) or None,
+            invoice_number=get(1).strip(),
+            payment_date=get(2),
+            payment_amount=parse_collmex_decimal(get(3)),
+            invoice_amount=parse_collmex_decimal(get(4)),
+            fiscal_year=get_int(5),
+            booking_id=get_int(6) or None,
+            payment_type=get(7),
         )
 
 

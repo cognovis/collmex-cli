@@ -334,18 +334,17 @@ def list_invoice_payments(
             rows = [
                 [
                     p.invoice_number,
-                    p.customer_id,
-                    p.customer_name,
                     p.payment_date,
                     p.payment_amount,
-                    p.payment_method,
+                    p.invoice_amount,
+                    p.fiscal_year,
                     p.booking_id,
                 ]
                 for p in payments
             ]
             output_table(
                 "Invoice Payments",
-                ["Invoice #", "Customer ID", "Customer", "Date", "Amount", "Method", "Booking ID"],
+                ["Invoice #", "Date", "Paid", "Invoice Total", "Year", "Booking ID"],
                 rows,
             )
             console.print(f"\n[dim]Total: {len(payments)} payments[/dim]")
