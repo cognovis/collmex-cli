@@ -471,3 +471,143 @@ def parse_record(row: list[str]) -> CollmexRecord | None:
         return None
 
     return model_class.from_csv_row(row)
+
+
+# =============================================================================
+# Invoice (Kundenrechnung) - CMXINV
+# =============================================================================
+
+
+class InvoiceLine(BaseModel):
+    """A single line item of a Collmex invoice (CMXINV, position > 0)."""
+
+    model_config = {"extra": "ignore"}
+
+    position: int = Field(default=0, description="Position number")
+    text: str = Field(default="", description="Position text/description")
+    quantity: Decimal | None = Field(default=None, description="Quantity")
+    unit: str = Field(default="", description="Unit of measure")
+    price: Decimal | None = Field(default=None, description="Unit price")
+    price_type: int = Field(default=0, description="0=gross, 1=net")
+    vat_rate: Decimal | None = Field(default=None, description="VAT rate (%)")
+    product_id: str = Field(default="", description="Product/article ID")
+    product_type: int = Field(default=0, description="Product type")
+    revenue_account: int | None = Field(default=None, description="Revenue account")
+    cost_center: int | None = Field(default=None, description="Cost center")
+    total_net: Decimal | None = Field(default=None, description="Line net total")
+    total_vat: Decimal | None = Field(default=None, description="Line VAT total")
+    total_gross: Decimal | None = Field(default=None, description="Line gross total")
+
+
+class Invoice(BaseModel):
+    """A Collmex customer invoice (CMXINV), assembled from header + line rows."""
+
+    model_config = {"extra": "ignore"}
+
+    invoice_id: int = Field(default=0, description="Invoice number")
+    invoice_type: int = Field(default=0, description="0=Rechnung, 1=Gutschrift, 2=Lieferschein")
+    customer_id: int | None = Field(default=None, description="Customer number")
+    customer_salutation: str = Field(default="", description="Customer salutation")
+    customer_title: str = Field(default="", description="Customer title")
+    customer_company: str = Field(default="", description="Customer company name")
+    customer_first_name: str = Field(default="", description="Customer first name")
+    customer_last_name: str = Field(default="", description="Customer last name")
+    customer_street: str = Field(default="", description="Customer street")
+    customer_zip: str = Field(default="", description="Customer postal code")
+    customer_city: str = Field(default="", description="Customer city")
+    customer_country: str = Field(default="", description="Customer country")
+    customer_phone: str = Field(default="", description="Customer phone")
+    customer_fax: str = Field(default="", description="Customer fax")
+    customer_email: str = Field(default="", description="Customer email")
+    invoice_date: date | None = Field(default=None, description="Invoice date")
+    payment_term: int = Field(default=0, description="Payment term code")
+    discount_days: int = Field(default=0, description="Discount days")
+    discount_percent: Decimal | None = Field(default=None, description="Discount percentage")
+    currency: str = Field(default="EUR", description="Currency (ISO)")
+    price_group: int = Field(default=0, description="Price group")
+    discount_total: Decimal | None = Field(default=None, description="Total discount")
+    due_date: date | None = Field(default=None, description="Due date")
+    total_net: Decimal | None = Field(default=None, description="Total net amount")
+    total_vat: Decimal | None = Field(default=None, description="Total VAT amount")
+    total_gross: Decimal | None = Field(default=None, description="Total gross amount")
+    cancelled: int = Field(default=0, description="0=active, 1=cancelled")
+    invoice_number_text: str = Field(default="", description="Human-readable invoice number")
+    lines: list[InvoiceLine] = Field(default_factory=list, description="Invoice line items")
+
+    @classmethod
+    def from_cmxinv_rows(cls, rows: list[list[str]]) -> list["Invoice"]:
+        """Parse a list of CMXINV rows into grouped Invoice objects.
+
+        Rows with position=0 are header rows; rows with position>0 are line items.
+        Invoices are grouped by invoice_id.
+        """
+        invoices_map: dict[int, "Invoice"] = {}
+
+        for row in rows:
+            if not row or row[0] != "CMXINV":
+                continue
+
+            def get(idx: int, default: str = "", _row: list[str] = row) -> str:
+                return _row[idx] if idx < len(_row) else default
+
+            def get_int(idx: int, default: int = 0, _row: list[str] = row) -> int:
+                return _parse_int(get(idx, str(default), _row), default)
+
+            invoice_id = get_int(1)
+            position = get_int(2)
+
+            if position == 0:
+                inv = cls(
+                    invoice_id=invoice_id,
+                    invoice_type=get_int(3),
+                    customer_id=get_int(4) or None,
+                    customer_salutation=get(5),
+                    customer_title=get(6),
+                    customer_company=get(7),
+                    customer_first_name=get(8),
+                    customer_last_name=get(9),
+                    customer_street=get(10),
+                    customer_zip=get(11),
+                    customer_city=get(12),
+                    customer_country=get(13),
+                    customer_phone=get(14),
+                    customer_fax=get(15),
+                    customer_email=get(16),
+                    invoice_date=parse_collmex_date(get(18)),
+                    payment_term=get_int(19),
+                    discount_days=get_int(22),
+                    discount_percent=parse_collmex_decimal(get(23)),
+                    currency=get(26) or "EUR",
+                    price_group=get_int(27),
+                    discount_total=parse_collmex_decimal(get(28)),
+                    due_date=parse_collmex_date(get(31)),
+                    total_net=parse_collmex_decimal(get(50)),
+                    total_vat=parse_collmex_decimal(get(51)),
+                    total_gross=parse_collmex_decimal(get(52)),
+                    cancelled=get_int(56),
+                    invoice_number_text=get(57),
+                )
+                invoices_map[invoice_id] = inv
+            else:
+                if invoice_id not in invoices_map:
+                    invoices_map[invoice_id] = cls(invoice_id=invoice_id)
+
+                line = InvoiceLine(
+                    position=position,
+                    text=get(33),
+                    quantity=parse_collmex_decimal(get(34)),
+                    unit=get(35),
+                    price=parse_collmex_decimal(get(36)),
+                    price_type=get_int(37),
+                    vat_rate=parse_collmex_decimal(get(38)),
+                    product_id=get(39),
+                    product_type=get_int(40),
+                    revenue_account=get_int(42) or None,
+                    cost_center=get_int(44) or None,
+                    total_net=parse_collmex_decimal(get(50)),
+                    total_vat=parse_collmex_decimal(get(51)),
+                    total_gross=parse_collmex_decimal(get(52)),
+                )
+                invoices_map[invoice_id].lines.append(line)
+
+        return list(invoices_map.values())
