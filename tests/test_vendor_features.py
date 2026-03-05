@@ -324,6 +324,34 @@ class TestVendorUpdateCommand:
         assert result.exit_code == 0
         instance.update_vendor.assert_called_once()
 
+    @patch("collmex_cli.main.CollmexClient", autospec=True)
+    def test_vendor_update_country_flag(self, mock_client_cls):
+        """vendor-update --vendor-id 42 --country IE sets country=IE."""
+        instance = mock_client_cls.return_value.__enter__.return_value
+        instance.update_vendor.return_value = make_vendor(vendor_id=42, country="IE")
+
+        result = runner.invoke(app, [
+            "vendor-update", "--vendor-id", "42", "--country", "IE",
+        ])
+        assert result.exit_code == 0
+        instance.update_vendor.assert_called_once_with(vendor_id=42, country="IE")
+
+    @patch("collmex_cli.main.CollmexClient", autospec=True)
+    def test_vendor_update_country_warns_on_overwrite(self, mock_client_cls):
+        """vendor-update warns when changing country from existing value."""
+        instance = mock_client_cls.return_value.__enter__.return_value
+
+        existing = make_vendor(vendor_id=42, country="DE")
+        updated = make_vendor(vendor_id=42, country="IE")
+        instance.get_vendors.return_value = [existing]
+        instance.update_vendor.return_value = updated
+
+        result = runner.invoke(app, [
+            "vendor-update", "--vendor-id", "42", "--country", "IE",
+        ])
+        assert result.exit_code == 0
+        assert "country" in result.output or "Warning" in result.output
+
 
 # =============================================================================
 # Bead collmex-cli-fjf: zugferd-create validation

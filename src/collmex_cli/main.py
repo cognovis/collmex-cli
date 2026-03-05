@@ -211,6 +211,7 @@ def update_vendor(
     bic: Annotated[str | None, typer.Option("--bic", help="BIC/SWIFT code")] = None,
     email: Annotated[str | None, typer.Option("--email", help="Email address")] = None,
     phone: Annotated[str | None, typer.Option("--phone", help="Phone number")] = None,
+    country: Annotated[str | None, typer.Option("--country", help="Country code (ISO 2-letter)")] = None,
     json_output: Annotated[bool, typer.Option("--json", "-j", help="Output as JSON")] = False,
 ) -> None:
     """Update an existing vendor (Lieferant).
@@ -240,6 +241,8 @@ def update_vendor(
         updates["email"] = email
     if phone is not None:
         updates["phone"] = phone
+    if country is not None:
+        updates["country"] = country
 
     if not updates:
         err_console.print("[red]Error:[/red] No fields to update. Specify at least one field option.")
@@ -252,7 +255,7 @@ def update_vendor(
             if existing:
                 current = existing[0]
                 # Warn when overwriting non-empty critical fields
-                for field in ("company_name", "street", "postal_code", "city"):
+                for field in ("company_name", "street", "postal_code", "city", "country"):
                     if field in updates:
                         current_val = getattr(current, field, "")
                         new_val = updates[field]
