@@ -484,3 +484,101 @@ class TestZugferdCreateValidation:
         # Should not exit with 1 due to validation
         assert result.exit_code == 0
         mock_xml.assert_called_once()
+
+
+# =============================================================================
+# Bead ez1: zugferd TaxRegistration schemeID correctness
+# =============================================================================
+
+
+class TestZugferdTaxRegistrationSchemeID:
+    """Tests that TaxRegistration schemeID and text are in the correct order."""
+
+    def _make_config(self, buyer_vat_id=None):
+        from collmex_cli.config import CollmexConfig
+
+        return CollmexConfig(
+            customer_id="1",
+            username="test",
+            password="test",
+            buyer_name="Buyer GmbH",
+            buyer_street="Buyer Str. 1",
+            buyer_zip="10115",
+            buyer_city="Berlin",
+            buyer_vat_id=buyer_vat_id,
+        )
+
+    def _make_line_items(self):
+        from decimal import Decimal
+
+        return [
+            {
+                "description": "Beratung",
+                "quantity": Decimal("1"),
+                "unit_price": Decimal("100.00"),
+                "tax_rate": Decimal("19.00"),
+            }
+        ]
+
+    def test_seller_tax_registration_scheme_id_is_va(self):
+        """Seller TaxRegistration must have schemeID='VA' and text=vat_id."""
+        from datetime import date
+
+        from collmex_cli.zugferd import create_zugferd_xml
+
+        vendor = make_vendor(vat_id="DE265761887", iban="", bic="")
+        xml_bytes = create_zugferd_xml(
+            vendor=vendor,
+            invoice_number="INV-001",
+            invoice_date=date(2026, 1, 15),
+            line_items=self._make_line_items(),
+            config=self._make_config(),
+        )
+        xml_str = xml_bytes.decode("utf-8")
+        assert 'schemeID="VA"' in xml_str, "schemeID='VA' missing in XML"
+        assert "DE265761887" in xml_str, "VAT ID missing in XML"
+        # Ensure the inverted form is not present
+        assert 'schemeID="DE265761887"' not in xml_str, (
+            "VAT ID must not appear as schemeID attribute"
+        )
+
+    def test_buyer_tax_registration_not_added_when_not_configured(self):
+        """No buyer TaxRegistration in XML when buyer_vat_id is not set."""
+        from datetime import date
+
+        from collmex_cli.zugferd import create_zugferd_xml
+
+        vendor = make_vendor(vat_id="DE265761887", iban="", bic="")
+        xml_bytes = create_zugferd_xml(
+            vendor=vendor,
+            invoice_number="INV-002",
+            invoice_date=date(2026, 1, 15),
+            line_items=self._make_line_items(),
+            config=self._make_config(buyer_vat_id=None),
+        )
+        # Only one TaxRegistration should appear (the seller's)
+        xml_str = xml_bytes.decode("utf-8")
+        assert xml_str.count('schemeID="VA"') == 1
+
+    def test_buyer_tax_registration_scheme_id_is_va(self):
+        """Buyer TaxRegistration must have schemeID='VA' and text=buyer_vat_id."""
+        from datetime import date
+
+        from collmex_cli.zugferd import create_zugferd_xml
+
+        vendor = make_vendor(vat_id="DE265761887", iban="", bic="")
+        config = self._make_config(buyer_vat_id="DE111222333")
+        xml_bytes = create_zugferd_xml(
+            vendor=vendor,
+            invoice_number="INV-003",
+            invoice_date=date(2026, 1, 15),
+            line_items=self._make_line_items(),
+            config=config,
+        )
+        xml_str = xml_bytes.decode("utf-8")
+        assert "DE111222333" in xml_str, "Buyer VAT ID missing in XML"
+        assert 'schemeID="DE111222333"' not in xml_str, (
+            "Buyer VAT ID must not appear as schemeID attribute"
+        )
+        # Both seller and buyer registrations present
+        assert xml_str.count('schemeID="VA"') == 2
