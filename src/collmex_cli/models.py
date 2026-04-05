@@ -29,8 +29,21 @@ def _parse_int(value: str, default: int = 0) -> int:
 
 
 def parse_collmex_date(value: str) -> date | None:
-    """Parse Collmex date format (YYYYMMDD) to date object."""
+    """Parse Collmex date format (YYYYMMDD) to date object.
+
+    Handles float-formatted strings (e.g. "20260201.0") that occur when
+    Collmex returns numeric date values that get parsed as floats.
+    """
     if not value:
+        return None
+    # Handle float-formatted strings like "20260201.0"
+    if "." in value:
+        try:
+            value = str(int(float(value)))
+        except (ValueError, OverflowError):
+            return None
+    # Need exactly 8 digits for YYYYMMDD; short/zero values mean "no date"
+    if len(value) < 8:
         return None
     # Collmex uses YYYYMMDD format
     return date(int(value[:4]), int(value[4:6]), int(value[6:8]))
@@ -447,6 +460,8 @@ class VendorInvoice(CollmexRecord):
     def parse_date(cls, v: Any) -> date | None:
         if isinstance(v, date):
             return v
+        if isinstance(v, (int, float)):
+            v = str(int(v))
         if isinstance(v, str):
             return parse_collmex_date(v)
         return None
@@ -515,6 +530,8 @@ class OpenItem(CollmexRecord):
     def parse_date(cls, v: Any) -> date | None:
         if isinstance(v, date):
             return v
+        if isinstance(v, (int, float)):
+            v = str(int(v))
         if isinstance(v, str):
             return parse_collmex_date(v)
         return None
@@ -598,6 +615,8 @@ class AccountingDocument(CollmexRecord):
     def parse_date(cls, v: Any) -> date | None:
         if isinstance(v, date):
             return v
+        if isinstance(v, (int, float)):
+            v = str(int(v))
         if isinstance(v, str):
             return parse_collmex_date(v)
         return None
@@ -732,6 +751,8 @@ class InvoicePayment(CollmexRecord):
     def parse_date(cls, v: Any) -> date | None:
         if isinstance(v, date):
             return v
+        if isinstance(v, (int, float)):
+            v = str(int(v))
         if isinstance(v, str):
             return parse_collmex_date(v)
         return None

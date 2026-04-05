@@ -1051,7 +1051,7 @@ def import_statements(
 
                 try:
                     mm_result = subprocess.run(
-                        ["mm", "export", "-a", mm_name, "--from", start, "-f", "sta", "-o", str(tmp_path)],
+                        ["mm", "export", "-a", mm_name, "--from", start, "--format", "sta", "-o", str(tmp_path)],
                         capture_output=True,
                         text=True,
                         timeout=30,
@@ -1186,7 +1186,7 @@ def import_statements(
                             mm_name,
                             "--from",
                             start,
-                            "-f",
+                            "--format",
                             "sta",
                             "-o",
                             str(tmp_path),
