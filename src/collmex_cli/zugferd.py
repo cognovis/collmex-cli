@@ -237,7 +237,7 @@ def _add_pdfa3_conformance(pdf_bytes: bytes) -> bytes:
 
     with pikepdf.open(BytesIO(pdf_bytes)) as pdf:
         with pdf.open_metadata(set_pikepdf_as_editor=False) as metadata:
-            metadata.register_xml_namespace("pdfaid", "http://www.aiim.org/pdfa/ns/id/")
+            metadata.register_xml_namespace("http://www.aiim.org/pdfa/ns/id/", "pdfaid")
             metadata["pdfaid:part"] = "3"
             metadata["pdfaid:conformance"] = "B"
 
