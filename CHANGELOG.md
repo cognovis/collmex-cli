@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+### Fixed
+
+- *(zugferd)* Fix PaymentMeans `payee_account` Container API usage — crash when vendor has IBAN (`collmex-cli-983`)
+
 ### Changed
 
 - *(timing-helper)* `query_timing_entries()`: `hourly_rate` is now a required argument — the 130.0 code default was removed. Billing rates are policy and must be resolved by the caller (invoice skill) from Angebot -> per-customer config -> interactive prompt. Resolves `collmex-cli-47o`.
