@@ -30,7 +30,7 @@ on run argv
     tell application "Mail"
         activate
 
-        set customerMessage to make new outgoing message with properties {subject:"Rechnung " & invoiceNumber, content:"Guten Tag," & return & return & "anbei erhalten Sie die Rechnung " & invoiceNumber & "." & return & return & "Viele Grusse" & return & "Malte Sussdorff", visible:true}
+        set customerMessage to make new outgoing message with properties {subject:"Rechnung " & invoiceNumber, content:"Guten Tag," & return & return & "anbei erhalten Sie die Rechnung " & invoiceNumber & "." & return & return & "Viele Grüße" & return & "Malte Sussdorff", visible:true}
         tell customerMessage
             make new to recipient at end of to recipients with properties {address:customerEmail}
             make new attachment with properties {file name:POSIX file pdfPath}

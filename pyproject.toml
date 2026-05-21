@@ -50,7 +50,7 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "library/sussdorff-core/skills/business/customer-invoice/tests"]
 
 [tool.ruff]
 target-version = "py314"

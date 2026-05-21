@@ -2,7 +2,7 @@ from pathlib import Path
 import re
 
 
-INVOICE_NUMBER_RE = re.compile(r"^I(?P<year>\d{4})_(?P<month>\d{2})_(?P<seq>\d{4})(?:\..*)?$")
+INVOICE_NUMBER_RE = re.compile(r"^I(?P<year>\d{4})_(?P<month>\d{2})_(?P<seq>\d{4})(?:\.(?:pdf|xml))?$")
 
 
 def invoice_number_from_parts(year: int, month: int, seq: int) -> str:
