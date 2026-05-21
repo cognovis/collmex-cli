@@ -25,6 +25,7 @@ dependencies = [
     "pydantic-settings>=2.0.0",
     "drafthorse>=2.4.0",
     "factur-x>=1.12",
+    "pikepdf>=8.0.0",
     "reportlab>=4.0.0",
 ]
 

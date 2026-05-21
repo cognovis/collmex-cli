@@ -5,6 +5,7 @@ Uses python-drafthorse to generate EN 16931 compliant XML.
 
 from __future__ import annotations
 
+import base64
 from datetime import date, timedelta
 from decimal import Decimal
 from io import BytesIO
@@ -21,6 +22,19 @@ from drafthorse.models.tradelines import LineItem
 from .config import CollmexConfig, get_config
 from .invoice_renderer import InvoiceData, InvoiceLineItem, validate_seller_config
 from .models import Customer, Vendor
+
+
+_SRGB_ICC_PROFILE_BASE64 = (
+    "AAACTGxjbXMEQAAAbW50clJHQiBYWVogB+oABQAVAA4AFQACYWNzcEFQUEwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPbW"
+    "AAEAAAAA0y1sY21zAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAALZGVzYwAAAQgAAAA2Y3By"
+    "dAAAAUAAAABMd3RwdAAAAYwAAAAUY2hhZAAAAaAAAAAsclhZWgAAAcwAAAAUYlhZWgAAAeAAAAAUZ1hZWgAAAfQAAAAUclRS"
+    "QwAAAggAAAAgZ1RSQwAAAggAAAAgYlRSQwAAAggAAAAgY2hybQAAAigAAAAkbWx1YwAAAAAAAAABAAAADGVuVVMAAAAaAAAA"
+    "HABzAFIARwBCACAAYgB1AGkAbAB0AC0AaQBuAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAADAAAAAcAE4AbwAgAGMAbwBwAHkA"
+    "cgBpAGcAaAB0ACwAIAB1AHMAZQAgAGYAcgBlAGUAbAB5WFlaIAAAAAAAAPbWAAEAAAAA0y1zZjMyAAAAAAABDEIAAAXe///z"
+    "JQAAB5MAAP2Q///7of///aIAAAPcAADAblhZWiAAAAAAAABvoAAAOPUAAAOQWFlaIAAAAAAAACSfAAAPhAAAtsNYWVogAAAA"
+    "AAAAYpcAALeHAAAY2XBhcmEAAAAAAAMAAAACZmYAAPKnAAANWQAAE9AAAApbY2hybQAAAAAAAwAAAACj1wAAVHsAAEzNAACZ"
+    "mgAAJmYAAA9c"
+)
 
 
 def validate_vendor_for_zugferd(vendor: Vendor) -> list[str]:
@@ -185,18 +199,20 @@ def embed_xml_in_pdf(pdf_content: bytes, xml_content: bytes, xml_filename: str =
     try:
         import facturx
     except ImportError:
-        return _embed_xml_with_pypdf(pdf_content, xml_content, xml_filename)
+        return _add_pdfa3_conformance(_embed_xml_with_pypdf(pdf_content, xml_content, xml_filename))
 
     generate_from_binary = getattr(facturx, "generate_from_binary", None)
     if generate_from_binary is not None:
-        return generate_from_binary(
-            pdf_content,
-            xml_content,
-            flavor="factur-x",
-            level="en16931",
-            afrelationship="Alternative",
-            check_xsd=False,
-            check_schematron=False,
+        return _add_pdfa3_conformance(
+            generate_from_binary(
+                pdf_content,
+                xml_content,
+                flavor="factur-x",
+                level="en16931",
+                afrelationship="Alternative",
+                check_xsd=False,
+                check_schematron=False,
+            )
         )
 
     generate_from_file = getattr(facturx, "generate_from_file", None)
@@ -209,9 +225,43 @@ def embed_xml_in_pdf(pdf_content: bytes, xml_content: bytes, xml_filename: str =
             pdf_path.write_bytes(pdf_content)
             xml_path.write_bytes(xml_content)
             generate_from_file(pdf_path, xml_path, output_pdf_file=output_path)
-            return output_path.read_bytes()
+            return _add_pdfa3_conformance(output_path.read_bytes())
 
-    return _embed_xml_with_pypdf(pdf_content, xml_content, xml_filename)
+    return _add_pdfa3_conformance(_embed_xml_with_pypdf(pdf_content, xml_content, xml_filename))
+
+
+def _add_pdfa3_conformance(pdf_bytes: bytes) -> bytes:
+    """Add PDF/A-3B identification metadata and an sRGB OutputIntent."""
+    import pikepdf
+    from pikepdf import Array, Dictionary, Name, Stream
+
+    with pikepdf.open(BytesIO(pdf_bytes)) as pdf:
+        with pdf.open_metadata(set_pikepdf_as_editor=False) as metadata:
+            metadata.register_xml_namespace("pdfaid", "http://www.aiim.org/pdfa/ns/id/")
+            metadata["pdfaid:part"] = "3"
+            metadata["pdfaid:conformance"] = "B"
+
+        icc_stream = Stream(pdf, _srgb_icc_profile())
+        icc_stream["/N"] = 3
+        icc_stream["/Alternate"] = Name("/DeviceRGB")
+        output_intent = Dictionary(
+            {
+                "/Type": Name("/OutputIntent"),
+                "/S": Name("/GTS_PDFA1"),
+                "/OutputConditionIdentifier": "sRGB IEC61966-2.1",
+                "/Info": "sRGB IEC61966-2.1",
+                "/DestOutputProfile": icc_stream,
+            }
+        )
+        pdf.Root["/OutputIntents"] = Array([output_intent])
+
+        output = BytesIO()
+        pdf.save(output, min_version="1.7")
+        return output.getvalue()
+
+
+def _srgb_icc_profile() -> bytes:
+    return base64.b64decode(_SRGB_ICC_PROFILE_BASE64)
 
 
 def _raise_for_missing_customer_fields(customer: Customer) -> None:
