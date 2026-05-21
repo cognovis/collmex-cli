@@ -11,7 +11,7 @@ from drafthorse.models.accounting import ApplicableTradeTax
 from drafthorse.models.document import Document
 from drafthorse.models.note import IncludedNote
 from drafthorse.models.party import TaxRegistration
-from drafthorse.models.payment import PaymentTerms
+from drafthorse.models.payment import PaymentMeans, PaymentTerms
 from drafthorse.models.tradelines import LineItem
 
 from .config import CollmexConfig, get_config
@@ -179,10 +179,12 @@ def create_zugferd_xml(
 
     # Payment means - bank transfer
     if vendor.iban:
-        doc.trade.settlement.payment_means.type_code = "58"  # SEPA credit transfer
-        doc.trade.settlement.payment_means.payee_account.iban = vendor.iban
+        pm = PaymentMeans()
+        pm.type_code = "58"  # SEPA credit transfer
+        pm.payee_account.iban = vendor.iban
         if vendor.bic:
-            doc.trade.settlement.payment_means.payee_institution.bic = vendor.bic
+            pm.payee_institution.bic = vendor.bic
+        doc.trade.settlement.payment_means.add(pm)
 
     # Payment terms
     if payment_terms_text or due_date:
