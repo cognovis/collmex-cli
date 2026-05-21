@@ -37,9 +37,14 @@ def query_timing_entries(
     customer: str,
     start_date: date,
     end_date: date,
-    hourly_rate: float = 130.0,
+    hourly_rate: float,
 ) -> TimingResult:
-    """Query Timing app for billable hours for the given customer and date range."""
+    """Query Timing app for billable hours for the given customer and date range.
+
+    The billing rate is policy, not a code default — it must be resolved by the caller
+    (invoice skill) from the agreed source: Angebot for the customer, then per-customer
+    config, then interactive prompt. See bead collmex-cli-47o for the resolution chain.
+    """
     script = _build_timing_script(start_date, end_date)
     output = run_applescript(script)
     hours_by_description: dict[str, float] = {}
