@@ -79,9 +79,14 @@ timing_result = query_timing_entries(
 )
 ```
 
-Collect travel costs with the external customer-invoice helper:
+Collect travel costs with the external customer-invoice helper. The
+`scripts/travel_costs.py` module lives in the sussdorff-core library
+outside this repo, so prepend its base directory to `sys.path` before
+importing:
 
 ```python
+import sys
+sys.path.insert(0, "/Users/malte/code/library/sussdorff-core/skills/business/customer-invoice")
 from scripts.travel_costs import get_travel_cost_positions
 
 travel_positions = get_travel_cost_positions(
@@ -207,7 +212,11 @@ Report:
 - `invoice_number.py`: next invoice number scanner.
 - `scripts/create_mail_drafts.sh`: visible Apple Mail drafts.
 - External travel helper:
-  `/Users/malte/code/library/sussdorff-core/skills/business/customer-invoice/scripts/travel_costs.py`
+  `/Users/malte/code/library/sussdorff-core/skills/business/customer-invoice/scripts/travel_costs.py`.
+  This file lives outside the collmex-cli repo and is not shipped with
+  this skill, so the import in Step 3 requires
+  `sys.path.insert(0, "/Users/malte/code/library/sussdorff-core/skills/business/customer-invoice")`
+  before `from scripts.travel_costs import ...`.
 
 ## Limitations
 
