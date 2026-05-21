@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+### Changed
+
+- *(timing-helper)* `query_timing_entries()`: `hourly_rate` is now a required argument — the 130.0 code default was removed. Billing rates are policy and must be resolved by the caller (invoice skill) from Angebot -> per-customer config -> interactive prompt. Resolves `collmex-cli-47o`.
+
 ### Added
 
 - **`customer-invoice` command**: Book outgoing invoices directly in Collmex accounting without the invoicing module (CMXUMS record type). Accepts `--customer-id`, `--invoice`, `--date`, `--net`, `--tax-rate` (default 19%), `--tax` (explicit override), `--text`, and `--account` (revenue account, default 8400).
