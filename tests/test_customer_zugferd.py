@@ -11,6 +11,8 @@ from unittest.mock import patch
 
 import pytest
 from facturx import xml_check_schematron
+import pikepdf
+from pikepdf import Name
 from pypdf import PdfReader
 from typer.testing import CliRunner
 
@@ -128,6 +130,21 @@ def _embedded_facturx_xml(pdf_bytes: bytes) -> bytes:
     return attachment
 
 
+def _zugferd_pdf_bytes() -> bytes:
+    xml_bytes = create_customer_zugferd_xml(
+        customer=_customer(),
+        invoice_number="I2026_05_0001",
+        invoice_date=date(2026, 5, 21),
+        line_items=_line_items(),
+        config=_seller_config(),
+    )
+    pdf_bytes = render_invoice_pdf(
+        invoice_data=_invoice_data(),
+        config=_seller_config(),
+    )
+    return embed_xml_in_pdf(pdf_bytes, xml_bytes)
+
+
 def test_seller_buyer_roles(tmp_path):
     """CLI output embeds XML with cognovis as seller and the Collmex customer as buyer."""
     customer = _customer()
@@ -220,6 +237,46 @@ def test_output_pdfa3_embedded_xml():
     assert output_bytes.startswith(b"%PDF")
     assert b"cognovis GmbH" in output_bytes
     assert _embedded_facturx_xml(output_bytes) == xml_bytes
+
+
+def test_output_pdf_contains_pdfa3b_xmp_metadata():
+    """PDF output declares PDF/A-3B conformance in XMP metadata."""
+    output_bytes = _zugferd_pdf_bytes()
+
+    with pikepdf.open(BytesIO(output_bytes)) as pdf:
+        with pdf.open_metadata() as metadata:
+            assert metadata["pdfaid:part"] == "3"
+            assert metadata["pdfaid:conformance"] == "B"
+
+
+def test_output_pdf_contains_output_intent_with_valid_icc_profile():
+    """PDF output contains an OutputIntent with an embedded RGB ICC profile."""
+    output_bytes = _zugferd_pdf_bytes()
+
+    with pikepdf.open(BytesIO(output_bytes)) as pdf:
+        output_intents = pdf.Root["/OutputIntents"]
+        assert len(output_intents) >= 1
+        output_intent = output_intents[0]
+        assert output_intent["/Type"] == Name("/OutputIntent")
+        assert output_intent["/S"] == Name("/GTS_PDFA1")
+        assert output_intent["/OutputConditionIdentifier"] == "sRGB IEC61966-2.1"
+
+        icc_profile = output_intent["/DestOutputProfile"]
+        icc_bytes = icc_profile.read_bytes()
+        assert icc_profile["/N"] == 3
+        assert int.from_bytes(icc_bytes[:4], byteorder="big") == len(icc_bytes)
+        assert icc_bytes[36:40] == b"acsp"
+
+
+def test_pdfa3b_conformance_confirmed_by_pikepdf_inspection():
+    """pikepdf inspection confirms the PDF/A-3B markers needed by validators."""
+    output_bytes = _zugferd_pdf_bytes()
+
+    with pikepdf.open(BytesIO(output_bytes)) as pdf:
+        with pdf.open_metadata() as metadata:
+            assert metadata["pdfaid:part"] == "3"
+            assert metadata["pdfaid:conformance"] == "B"
+        assert pdf.Root["/OutputIntents"][0]["/DestOutputProfile"].read_bytes()[36:40] == b"acsp"
 
 
 def test_multiline_invoice_totals():
