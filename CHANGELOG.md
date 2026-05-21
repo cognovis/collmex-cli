@@ -1,3 +1,13 @@
+## [Unreleased]
+
+### Features
+
+- *(customer-invoice)* Add travel cost retrieval from MoneyMoney and manual mileage entry
+  - `get_moneymoney_travel_costs(category)` calls `mm transactions --category <name> --format json` and returns a list of `TravelCostPosition` objects; raises `MissingCategoryError` if the category is unavailable or the command fails
+  - `get_manual_mileage_costs()` prompts interactively for mileage entries (e.g. `2 * 750 km @ 0.38`) or flat amounts (e.g. `570 EUR`) and returns computed `TravelCostPosition` objects; empty input ends entry
+  - `get_travel_cost_positions(category)` combines both sources into a single list
+  - All error paths (mm unavailable, category not found, JSON parse error) surface as `MissingCategoryError` — no silent data loss
+
 ## [2026.03.8] - 2026-03-06
 
 ### 🐛 Bug Fixes
