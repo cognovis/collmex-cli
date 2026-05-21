@@ -156,8 +156,8 @@ def test_rejects_too_many_line_items_for_single_page_renderer():
     """Invoices that cannot fit the one-page renderer fail clearly."""
     invoice = _invoice_data()
     invoice.line_items = [
-        InvoiceLineItem(f"Beratung {index}", "1,00 Std.", "185,00", "185,00") for index in range(16)
+        InvoiceLineItem(f"Beratung {index}", "1,00 Std.", "185,00", "185,00") for index in range(9)
     ]
 
-    with pytest.raises(ValueError, match="supports at most 15"):
+    with pytest.raises(ValueError, match="supports at most 8"):
         render_invoice_pdf(invoice, config=_seller_config())

@@ -128,7 +128,18 @@ class CollmexConfig(BaseSettings):
     @property
     def seller_configured(self) -> bool:
         """Check if all mandatory seller fields for invoice rendering are configured."""
-        return all([self.seller_name, self.seller_street, self.seller_zip, self.seller_city, self.seller_vat_id])
+        return all(
+            [
+                self.seller_name,
+                self.seller_street,
+                self.seller_zip,
+                self.seller_city,
+                self.seller_vat_id,
+                self.seller_hrb,
+                self.seller_iban,
+                self.seller_bic,
+            ]
+        )
 
     def validate_seller_fields(self) -> list[str]:
         """Return list of missing mandatory seller fields."""
@@ -138,6 +149,9 @@ class CollmexConfig(BaseSettings):
             "seller_zip": self.seller_zip,
             "seller_city": self.seller_city,
             "seller_vat_id": self.seller_vat_id,
+            "seller_hrb": self.seller_hrb,
+            "seller_iban": self.seller_iban,
+            "seller_bic": self.seller_bic,
         }
         return [k for k, v in required.items() if not v]
 

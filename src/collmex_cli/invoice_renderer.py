@@ -55,7 +55,9 @@ def validate_seller_config(config: CollmexConfig) -> None:
     if missing:
         raise ValueError(
             f"Missing mandatory seller fields in config: {', '.join(missing)}. "
-            f"Set COLLMEX_SELLER_NAME, COLLMEX_SELLER_STREET, etc."
+            f"Set COLLMEX_SELLER_NAME, COLLMEX_SELLER_STREET, COLLMEX_SELLER_ZIP, "
+            f"COLLMEX_SELLER_CITY, COLLMEX_SELLER_VAT_ID, COLLMEX_SELLER_HRB, "
+            f"COLLMEX_SELLER_IBAN, COLLMEX_SELLER_BIC."
         )
 
 
@@ -165,7 +167,11 @@ def _draw_recipient_and_metadata(pdf: canvas.Canvas, width: float, height: float
 
 
 def _draw_line_items(pdf: canvas.Canvas, height: float, invoice_data: InvoiceData) -> float:
-    max_items = 15
+    # Vertical budget on A4: items start at height-155mm and the summary block
+    # plus mandatory footer (Pflichtangaben) require ~80mm of reserved space
+    # below the last line item. Above 8 items the totals/notes block collides
+    # with or runs past the footer, so we reject overflow up-front.
+    max_items = 8
     if len(invoice_data.line_items) > max_items:
         raise ValueError(
             f"Invoice has {len(invoice_data.line_items)} line items but single-page renderer "
