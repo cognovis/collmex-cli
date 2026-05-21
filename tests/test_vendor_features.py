@@ -582,3 +582,25 @@ class TestZugferdTaxRegistrationSchemeID:
         )
         # Both seller and buyer registrations present
         assert xml_str.count('schemeID="VA"') == 2
+
+    def test_vendor_iban_is_serialized_in_payment_means(self):
+        """Vendor IBAN is written to the generated ZUGFeRD XML."""
+        from datetime import date
+
+        from collmex_cli.zugferd import create_zugferd_xml
+
+        vendor = make_vendor(
+            vat_id="DE265761887",
+            iban="DE89370400440532013000",
+            bic="COBADEFFXXX",
+        )
+        xml_bytes = create_zugferd_xml(
+            vendor=vendor,
+            invoice_number="INV-004",
+            invoice_date=date(2026, 1, 15),
+            line_items=self._make_line_items(),
+            config=self._make_config(),
+        )
+        xml_str = xml_bytes.decode("utf-8")
+        assert vendor.iban in xml_str, "Vendor IBAN missing in XML"
+        assert vendor.bic in xml_str, "Vendor BIC missing in XML"
