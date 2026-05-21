@@ -1,207 +1,241 @@
 # Beads Workflow Context
 
-> **Context Recovery**: Run `bd prime` after compaction, clear, or new session
-> Hooks auto-call this in Claude Code when .beads/ detected
+> Auto-loaded at session start by the SessionStart hook (Claude + Codex).
+> Re-run `bd prime` after compaction. This file is the single source of truth
+> for "how to work with bd in this repo." Do NOT duplicate its content in
+> AGENTS.md, CLAUDE.md, or skills.
 
-# Session Close Protocol v2
+## Default rules
 
-Das erweiterte Session Close Protokoll wird durch `/session-close` orchestriert:
+- Use `bd` for ALL task tracking. No `TodoWrite`, no `TaskCreate`, no `MEMORY.md`.
+- Create a bead BEFORE writing code. Mark `in_progress` when starting.
+- Memory lives in **open-brain**. **Coding harness (Claude Code / Codex CLI):** use
+  `ob save` / `ob search` (direct connection, no MCP round-trip). **Mobile / admin
+  (claude.ai, iOS):** use `mcp__open-brain__save_memory`. Do NOT use
+  `bd remember` / `bd memories` / `bd forget` — they exist in the bd CLI but are
+  not part of this workflow.
+- Source code is English (comments, identifiers, log messages). User-facing
+  strings may be localized.
+- Work is NOT done until `git push` succeeds.
 
-```bash
-/session-close
-```
+## Entrypoints
 
-Dies handhabt automatisch:
-- Offene Beads schließen (interaktiv)
-- Conventional Commits
-- CalVer Versionierung (YYYY.0M.MICRO)
-- Changelog-Generierung (git-cliff)
-- Doku-Gaps Detection
-- Learnings-Extraktion
-- Git commit + tag + push + `bd dolt commit` + `bd dolt push`
+| When | Do |
+|---|---|
+| Start work on bead `<id>` | `cld -b <id>` (Claude) or `cdx -b <id>` (Codex) |
+| Quick-fix XS/S bug | `cld -bq <id>` / `cdx -bq <id>` |
+| User says "implement bead X" / "arbeite an bead X" in chat | Spawn the `bead-orchestrator` agent with bead_id=X (Claude: `Agent(subagent_type="...:bead-orchestrator")`; Codex: spawn the agent defined in `~/.codex/agents/bead-orchestrator.toml`) |
+| Find work | `bd ready` (or `bd list --status=open`) |
+| Show details | `bd show <id>` |
 
-Flags: `--dry-run`, `--skip-beads`, `--skip-learnings`, `--skip-push`
+The orchestrator self-routes to quick-fix in Phase 0 if the bead's `effort` and
+`type` match the quick-fix profile, so spawning the full orchestrator is always
+safe.
 
-Siehe auch: elysium-uwm (Skill-Implementierung)
+## Bead types — the 9 built-ins
 
-**Fallback** (wenn Skill nicht verfügbar):
-```
-[ ] 1. git status              (check what changed)
-[ ] 2. git add <files>         (stage code changes)
-[ ] 3. bd dolt commit          (commit beads changes)
-[ ] 4. git commit -m "..."     (commit code)
-[ ] 5. bd dolt push            (push beads to remote)
-[ ] 6. git push                (push to remote)
-```
+`bd types` lists what's valid. Aliases: `feat`/`enhancement` → `feature`,
+`adr`/`dec` → `decision`. Custom types via `types.custom` (currently unset).
 
-**NEVER skip this.** Work is not done until pushed.
+| Type | When to use | bd lint requires |
+|---|---|---|
+| `task` (default) | Internal work, not user-facing. Refactors, infra, docs, tooling. | Acceptance Criteria |
+| `bug` | Something is broken. Behavior diverges from intent. | Steps to Reproduce + Acceptance Criteria |
+| `feature` | New user-facing capability. **Project rule: also requires `## Scenario` section** (orchestrator Phase 0 blocks if missing). | Acceptance Criteria |
+| `chore` | Boring maintenance: dep bumps, lint, formatting, version tags. | (none) |
+| `epic` | Tracking parent for many beads. Don't implement directly — slice into children. | Success Criteria |
+| `decision` | Architecture Decision Record (ADR). Tag with `--add-label=decision`. | (none enforced) |
+| `spike` | Timeboxed investigation to reduce uncertainty before committing to a story. Output: notes + a follow-up bead. | (none enforced) |
+| `story` | User story describing a feature from the user's perspective. We rarely use this — prefer `feature`. | (none enforced) |
+| `milestone` | Marks completion of a set of related issues. Contains no work. | (none enforced) |
 
-## Means of Compliance (MoC)
+**In practice we use `task / bug / feature / chore / epic / decision`. The other
+three (`spike / story / milestone`) are valid but dormant.**
 
-Jedes Akzeptanzkriterium eines Beads muss eine definierte Nachweismethode haben.
-MoC wird VOR dem Coden festgelegt — nicht nachtraeglich.
+Validate before claim: `bd lint <id>` (or `bd lint` for all open). The
+orchestrator's Phase 0 also runs the scenario check for features.
 
-### MoC-Typen
+## Priority
 
-| Kuerzel | Nachweismethode | Wann verwenden |
-|---------|----------------|----------------|
-| `unit` | Unit-Test (pytest/jest/go test/etc.) | Funktionslogik, Berechnungen, Datentypen |
-| `e2e` | E2E-Test (Playwright/Cypress) | User-Workflows, UI-Interaktionen |
-| `integ` | Integration-Test | API-Aufrufe, Service-Kommunikation, DB-Queries |
-| `review` | Manueller Code-Review | Architektur-Entscheidungen, Code-Qualitaet |
-| `demo` | Live-Demo / Screenshot | UI-Layout, visuelles Verhalten |
-| `doc` | Dokumentation / Statement | Nicht-funktionale Anforderungen, Prozessaenderungen |
+| Value | Meaning |
+|---|---|
+| `0` / `P0` | Critical — production down, security, data loss |
+| `1` / `P1` | High — important features, blocking bugs |
+| `2` (default) | Medium |
+| `3` | Low — polish, optimization |
+| `4` | Backlog |
 
-### MoC-Template fuer Bead-Erstellung
+Pass numeric (`-p 1`) or label (`-p P1`). Do NOT pass `high`/`medium`/`low` — bd
+rejects them.
 
-Bei `bd create` oder als Comment nach Erstellung:
+## Effort
+
+Set with `bd update <id> --metadata='{"effort":"medium"}'`. Empty effort triggers
+auto-estimation in the orchestrator's Phase 0.
+
+| Effort | Scope |
+|---|---|
+| `micro` (XS) | 1 file, < 30 lines |
+| `small` (S) | 2-5 files, < 100 lines |
+| `medium` (M) | 5-15 files, non-trivial logic |
+| `large` (L) | 15+ files, architectural impact |
+| `xl` | Multiple subsystems, migration required |
+
+Routing: `effort ∈ {micro, small}` AND `type ∈ {bug, chore, task}` → quick-fix.
+Everything else → full orchestrator.
+
+## Means of Compliance (MoC) — at create time, not retrofitted
+
+Every acceptance criterion must declare HOW it will be proven. Pick one:
+
+| Method | Use when |
+|---|---|
+| `unit` | Function logic, calculations, data types |
+| `e2e` | User workflows, UI interactions (Playwright/Cypress) |
+| `integ` | API calls, service communication, DB queries |
+| `review` | Architectural decisions, code quality |
+| `demo` | UI layout, visual behavior (screenshot or live) |
+| `doc` | Non-functional requirements, process changes |
+
+Template (paste into description or notes):
 
 ```markdown
 ## Means of Compliance
 
-| # | Akzeptanzkriterium | MoC | Nachweis |
-|---|-------------------|-----|----------|
-| 1 | API gibt 200 bei gueltigem Input | unit | test_api_valid_input() |
-| 2 | Fehler-Toast bei Netzwerkfehler | e2e | test_error_toast.spec.ts |
-| 3 | Daten persistiert in DB | integ | test_db_persistence() |
-| 4 | Code folgt Repository-Patterns | review | PR-Review durch Maintainer |
+| # | Acceptance Criterion | MoC | Evidence |
+|---|----------------------|-----|----------|
+| 1 | API returns 200 on valid input | unit | test_api_valid_input() |
+| 2 | Error toast on network failure | e2e | test_error_toast.spec.ts |
+| 3 | Code follows repo patterns | review | PR review |
 ```
 
-### Regeln
+Close gate: orchestrator refuses to hand off to session-close until each AK has
+recorded evidence. `review` and `doc` are valid — not everything needs an
+automated test.
 
-- **Pflicht**: Jedes AK braucht mindestens einen MoC-Typ
-- **Vor dem Coden**: MoC wird in Phase -1 (Bead-Erstellung) oder /plan definiert
-- **Nachweis-Spalte**: Wird beim Schliessen ausgefuellt (Testname, Screenshot-Link, etc.)
-- **Close-Gate**: Agent darf Bead erst schliessen wenn alle MoC-Nachweise erbracht sind
-- **Kein Overkill**: `review` und `doc` sind valide MoC-Typen — nicht alles braucht automatisierte Tests
-
-## Core Rules
-- **Default**: Use beads for ALL task tracking (`bd create`, `bd ready`, `bd close`)
-- **Prohibited**: Do NOT use TodoWrite, TaskCreate, or markdown files for task tracking
-- **Workflow**: Create beads issue BEFORE writing code, mark in_progress when starting
-- Persistence you don't need beats lost context
-- Git workflow: hooks auto-sync, run `bd dolt commit && bd dolt push` at session end
-- Session management: check `bd ready` for available work
-
-## Essential Commands
-
-### Finding Work
-- `bd ready` - Show issues ready to work (no blockers)
-- `bd list --status=open` - All open issues
-- `bd list --status=in_progress` - Your active work
-- `bd show <id>` - Detailed issue view with dependencies
-
-### Creating & Updating
-- `bd create --title="..." --type=task|bug|feature --priority=2` - New issue
-  - Priority: 0-4 or P0-P4 (0=critical, 2=medium, 4=backlog). NOT "high"/"medium"/"low"
-- `bd update <id> --status=in_progress` - Claim work
-- `bd update <id> --assignee=username` - Assign to someone
-- `bd update <id> --title/--description/--notes/--design` - Update fields inline
-- `bd close <id>` - Mark complete
-- `bd close <id1> <id2> ...` - Close multiple issues at once (more efficient)
-- `bd close <id> --reason="explanation"` - Close with reason
-- **Tip**: When creating multiple issues/tasks/epics, use parallel subagents for efficiency
-- **WARNING**: Do NOT use `bd edit` - it opens $EDITOR (vim/nano) which blocks agents
-
-### Dependencies & Blocking
-- `bd dep add <issue> <depends-on>` - Add dependency (issue depends on depends-on)
-- `bd blocked` - Show all blocked issues
-- `bd show <id>` - See what's blocking/blocked by this issue
-
-### Sync & Collaboration
-- `bd dolt commit` - Commit pending Dolt changes (snapshots current state)
-- `bd dolt push` - Push to configured Dolt remote (requires remote server)
-- `bd dolt pull` - Pull from configured Dolt remote
-
-### Project Health
-- `bd stats` - Project statistics (open/closed/blocked counts)
-- `bd doctor` - Check for issues (sync problems, missing hooks)
-
-## Common Workflows
-
-**Starting work:**
-```bash
-bd ready           # Find available work
-bd show <id>       # Review issue details
-bd update <id> --status=in_progress  # Claim it
-```
-
-**Completing work:**
-```bash
-bd close <id1> <id2> ...    # Close all completed issues at once
-bd dolt commit && bd dolt push  # Commit + push to remote
-```
-
-**Creating dependent work:**
-```bash
-# Run bd create commands in parallel (use subagents for many items)
-bd create --title="Implement feature X" --type=feature
-bd create --title="Write tests for X" --type=task
-bd dep add beads-yyy beads-xxx  # Tests depend on Feature (Feature blocks tests)
-```
-
-### Labels
-
-- `bd label list` - Show available labels
-- `bd update <id> --add-label=<label>` - Add label to issue (repeatable)
-- `bd list --label=<label>` - Filter issues by label
-
-**Special Labels:**
-- `decision` - Architektur-Entscheidung (ADR). Use when a bead documents a significant
-  design decision, technology choice, or process change. Example:
-  ```bash
-  bd update <id> --add-label=decision
-  bd list --label=decision  # Find all past decisions
-  ```
-
----
-
-## 📝 Documentation Requirements
-
-### Progress Checkpoints (for longer tasks)
-
-Document progress at meaningful checkpoints - not after every step, but at:
-- **After research phase**: "Found 3 relevant files: x, y, z"
-- **After design decisions**: "Using DataProvider pattern because..."
-- **After major milestones**: "Tests passing, starting integration"
-- **When blocked**: "Blocked: missing API credentials"
+## Creating beads
 
 ```bash
-bd update <id> --append-notes="<checkpoint: current state, next steps>"
+bd create \
+  --title="Short summary" \
+  -t task|bug|feature|chore|epic|decision \
+  -p 0..4 \
+  --description="<long form, with required sections>" \
+  --acceptance="<criterion 1>; <criterion 2>" \
+  --metadata='{"effort":"medium"}'
 ```
 
-### Closing Beads
+For multi-line description / design / notes: write the body to a file first
+(e.g. `/tmp/<bead-slug>.md`) and pass `--body-file <path>`.
 
-**Default (all acceptance criteria met):**
+NEVER use:
+- `--description "$(cat <<EOF…EOF)"` — under codex's `zsh -lc` wrapper the
+  nested quoting breaks and surfaces a misleading "Dolt server unreachable"
+  error.
+- `--body-file -` with inline heredoc on the `bd` invocation itself — the
+  destructive-bash guardrail (dcg) matches patterns inside the heredoc body
+  (false positive) and blocks the whole `bd create`. See CL-2l4. Also
+  fragile under codex's shell wrapper.
+
 ```bash
-bd close <id> --reason="<1-line summary with key metrics>"
+cat > /tmp/cl-foo.md <<'EOF'
+<description>
+
+## Scenario
+As a <persona>, I can <action> so that <outcome>.
+
+## Means of Compliance
+| # | AK | MoC | Evidence |
+| 1 | ... | unit | ... |
+EOF
+
+bd create --title="..." -t feature -p 2 --body-file /tmp/cl-foo.md
 ```
 
-Good examples:
-- `"12 Methoden implementiert, 30/32 Tests passing (2 Windows-only geskippt)"`
-- `"Fixed SL-001 for M4/Tahoe, SIP-001 for Apple Silicon"`
-- `"Migrated 4 dataclasses to Pydantic, all tests green"`
+The `cat > /tmp/foo <<EOF` step is fine — dcg only inspects `Bash` tool
+calls for destructive command-tokens, not heredoc bodies fed to `cat`.
 
-Bad examples:
-- `"Closed"` ❌
-- `"Done"` ❌
-- `"Fixed"` ❌
+Discovered work? Link via dependency:
 
-**When there are exceptions or deviations:**
 ```bash
-bd update <id> --append-notes="<what didn't go as expected>"
-bd close <id> --reason="<summary>, see Notes for details"
+bd create --title="Found bug" -t bug -p 1 --deps discovered-from:<parent-id>
 ```
 
-Example:
-```bash
-bd update <id> --append-notes="get_kerberos_data() needs Domain-Joined environment - not testable standalone"
-bd close <id> --reason="11/12 methods done, Kerberos stub only (see Notes)"
+## Updating, claiming, closing
+
+| Action | Command |
+|---|---|
+| Claim atomically | `bd update <id> --claim` |
+| Append to audit trail | `bd update <id> --append-notes "<context: state, next steps>"` |
+| Replace description (long) | `bd update <id> --body-file <path>` (write to file first) |
+| Add label | `bd update <id> --add-label=<label>` |
+| Close with reason | `bd close <id> --reason "<1-line summary with metrics>"` |
+| Close many at once | `bd close <id1> <id2> ...` |
+
+Good close reasons: `"Migrated 4 dataclasses to Pydantic, all tests green"`,
+`"12 methods done, 30/32 tests passing (2 Windows-only skipped)"`.
+
+Bad: `"Done"`, `"Fixed"`, `"Closed"`.
+
+**Never use `bd edit`** — it opens `$EDITOR` and blocks agents.
+
+## Memory routing
+
+| What you want to save | Where |
+|---|---|
+| Decision/fact specific to *this bead's work* | `bd update <id> --append-notes "..."` |
+| Session summary at end of bead run | coding harness: `ob save "<text>" --type=session_summary --project=<proj>` · mobile/admin: `mcp__open-brain__save_memory` |
+| Cross-project learning, person/topic insight, architectural pattern | coding harness: `ob save "<text>" --type=observation --project=<proj>` · mobile/admin: `mcp__open-brain__save_memory` |
+| Per-session scratch | conversation context only — don't persist |
+
+Rule of thumb: if the next agent (in this repo or another) would benefit from
+knowing it tomorrow → open-brain. If it's just a footnote on this specific bead
+→ `--append-notes`. Anything else does not need to be persisted.
+
+## Session close
+
+The `core:session-close` agent owns merge + push + changelog + version tag +
+session summary. Trigger phrases: "session close", "session beenden", "release",
+"rc". Spawn via `Agent(subagent_type="core:session-close")` (Claude) or by
+invoking the agent defined in `~/.codex/agents/session-close.toml` (Codex).
+
+Manual fallback if the agent is unavailable:
+
+```
+[ ] git status               # confirm what changed
+[ ] git add <files>          # stage specific files (no -A / no .)
+[ ] bd dolt commit           # commit pending bd changes
+[ ] git commit -m "..."      # conventional commit
+[ ] bd dolt pull && bd dolt push --force   # Dolt bug dolthub/dolt#10807 workaround
+[ ] git push                 # push to remote
 ```
 
-### What NOT to include
+**Work is NOT done until pushed.**
 
-- Don't repeat acceptance criteria that were met (they're in the Description)
-- Don't list all changed files (visible in git diff)
-- Don't copy tables/specs already in the bead
-- Only document **exceptions** and **deviations** from the plan
+## Operational hazards
+
+- **Dolt lifecycle is owned by `brew services`, not `bd`.** Dolt runs under
+  `brew services start dolt` (launchd, `keep_alive: true`) from `~/.dolt-data/`
+  on port 3306. Never `bd dolt start` / `bd dolt stop` / `pkill dolt`
+  (corrupts journal). Use `brew services restart dolt` if the user has
+  authorized it; otherwise escalate. For deep diagnosis load the `dolt` skill.
+- **`bd dolt push` fails**: always retry as `bd dolt pull && bd dolt push --force`
+  (Dolt bug dolthub/dolt#10807). Never use raw `dolt push --force`. Exception:
+  on `no common ancestor`, do NOT force-push — re-clone (see `dolt` skill).
+- **"Dolt server unreachable … externally managed"**: shared-server mode is
+  intentional. Run `bd dolt status` once. If running → retry the bd command
+  (likely shell quoting); if not running → escalate to user. Do NOT `bd dolt
+  start`; the user owns the brew-services lifecycle.
+- **`bd show --json` returns an array**: always use `.[0]` in jq:
+  `bd show <id> --json | jq -r '.[0].description'`.
+- **No `--append-description`**: doesn't exist. For description edits: dump,
+  edit, write back via `--body-file`.
+
+## Labels
+
+- `bd label list` — show available labels
+- `bd update <id> --add-label=<label>` — add (repeatable)
+- `bd list --label=<label>` — filter
+
+Special labels:
+- `decision` — architectural decision record. `bd list --label=decision` finds them.
