@@ -1,3 +1,11 @@
+## [Unreleased]
+
+### Added
+
+- **`customer-invoice` command**: Book outgoing invoices directly in Collmex accounting without the invoicing module (CMXUMS record type). Accepts `--customer-id`, `--invoice`, `--date`, `--net`, `--tax-rate` (default 19%), `--tax` (explicit override), `--text`, and `--account` (revenue account, default 8400).
+- **CMXUMS model**: `CustomerInvoice` Pydantic model that serialises to the CMXUMS CSV format, creating a receivable (debtor) entry and an open item for the customer automatically.
+- The new command integrates with the existing `open-items --customer` and `bookings` commands: booked invoices appear as open customer items until payment is received and are visible in booking history with debtor and revenue accounts.
+
 ## [2026.03.8] - 2026-03-06
 
 ### 🐛 Bug Fixes
