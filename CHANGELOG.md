@@ -13,6 +13,7 @@
 
 ### Fixed
 
+- *(zugferd)* Enforce real PDF/A-3B conformance on `customer-zugferd-create` output: the generated PDF now embeds `pdfaid:part=3` and `pdfaid:conformance=B` XMP metadata markers and a valid sRGB ICC `/OutputIntent` entry. Previously the file lacked these markers and did not pass PDF/A-3B validation.
 - *(zugferd)* Fix PaymentMeans `payee_account` Container API usage — crash when vendor has IBAN (`collmex-cli-983`)
 
 ### Changed
