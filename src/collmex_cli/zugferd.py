@@ -189,15 +189,15 @@ def embed_xml_in_pdf(pdf_content: bytes, xml_content: bytes, xml_filename: str =
 
     generate_from_binary = getattr(facturx, "generate_from_binary", None)
     if generate_from_binary is not None:
-        for kwargs in (
-            {"facturx_level": "en16931", "check_xsd": False, "check_shematron": False},
-            {"facturx_level": "en16931"},
-            {},
-        ):
-            try:
-                return generate_from_binary(pdf_content, xml_content, **kwargs)
-            except TypeError:
-                continue
+        return generate_from_binary(
+            pdf_content,
+            xml_content,
+            flavor="factur-x",
+            level="en16931",
+            afrelationship="Alternative",
+            check_xsd=False,
+            check_schematron=False,
+        )
 
     generate_from_file = getattr(facturx, "generate_from_file", None)
     if generate_from_file is not None:
