@@ -111,6 +111,30 @@ collmex unmatched --account 1200
 collmex unmatched --json
 ```
 
+### Customer Invoices (Ausgangsrechnungen)
+
+```bash
+# Book a customer invoice in accounting (no invoicing module required)
+collmex customer-invoice \
+  --customer-id 10001 \
+  --invoice "RE-2024-042" \
+  --date 2024-01-15 \
+  --net 1000.00 \
+  --tax-rate 19 \
+  --text "Consulting January 2024" \
+  --account 8400
+
+# Override the computed tax amount explicitly
+collmex customer-invoice --customer-id 10001 --invoice "RE-2024-043" \
+  --date 2024-01-15 --net 500.00 --tax 95.00
+
+# Output as JSON
+collmex customer-invoice --customer-id 10001 --invoice "RE-2024-044" \
+  --date 2024-01-15 --net 200.00 --json
+```
+
+After booking, the invoice appears in `open-items --customer` until payment is received and in `bookings` with the debtor and revenue accounts.
+
 ### Vendor Invoices (Lieferantenrechnungen)
 
 ```bash
@@ -185,6 +209,7 @@ Currently supported Collmex record types:
 
 - `VENDOR_GET` / `CMXLIF` - Query and create vendors
 - `CMXLRN` - Create vendor invoices
+- `CMXUMS` - Create customer invoices (outgoing invoices in accounting)
 - `OPEN_ITEMS_GET` / `OPEN_ITEM` - Query open items
 - `ACCDOC_GET` / `ACCDOC` - Query accounting documents/bookings
 

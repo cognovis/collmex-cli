@@ -90,7 +90,7 @@ def create_zugferd_xml(
     # Add notes if provided
     if notes:
         note = IncludedNote()
-        note.content.add(notes)
+        note.content = notes
         doc.header.notes.add(note)
 
     # Seller (Vendor) party
@@ -116,7 +116,7 @@ def create_zugferd_xml(
     doc.trade.agreement.buyer.name = config.buyer_name
 
     if buyer_customer_id:
-        doc.trade.agreement.buyer.id.add(buyer_customer_id)
+        doc.trade.agreement.buyer.id = buyer_customer_id
 
     if config.buyer_street:
         doc.trade.agreement.buyer.address.line_one = config.buyer_street

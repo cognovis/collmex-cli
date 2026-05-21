@@ -494,6 +494,67 @@ class VendorInvoice(CollmexRecord):
 
 
 # =============================================================================
+# Customer Invoice - CMXUMS
+# =============================================================================
+
+
+class CustomerInvoice(CollmexRecord):
+    """Collmex customer invoice record (CMXUMS).
+
+    Used to book external customer invoices in accounting without the invoicing
+    module. Field 15 stays empty so Collmex books the receivable account and
+    creates an open item for the customer.
+    """
+
+    record_type: str = Field(default="CMXUMS", description="Record type identifier")
+    customer_id: int | None = Field(default=None, description="Customer number")
+    company_id: int = Field(default=1, description="Company ID")
+    invoice_date: date | None = Field(default=None, description="Invoice date")
+    invoice_number: str = Field(default="", description="Invoice number (unique)")
+    net_amount_full_tax: Decimal | None = Field(default=None, description="Net amount full VAT rate")
+    tax_full: Decimal | None = Field(default=None, description="Tax amount full VAT")
+    is_credit: bool = Field(default=False, description="True if credit note")
+    booking_text: str = Field(default="", description="Booking text")
+    payment_terms: str = Field(default="", description="Payment terms or due date")
+    account_full_tax: int | None = Field(default=None, description="Revenue account for full tax")
+
+    @field_validator("invoice_date", mode="before")
+    @classmethod
+    def parse_date(cls, v: Any) -> date | None:
+        if isinstance(v, date):
+            return v
+        if isinstance(v, (int, float)):
+            v = str(int(v))
+        if isinstance(v, str):
+            return parse_collmex_date(v)
+        return None
+
+    def to_csv_row(self) -> list[str]:
+        """Convert to CSV row for creating a customer invoice."""
+        return [
+            self.record_type,
+            str(self.customer_id) if self.customer_id is not None else "",
+            str(self.company_id),
+            format_collmex_date(self.invoice_date),
+            self.invoice_number,
+            format_collmex_decimal(self.net_amount_full_tax),
+            format_collmex_decimal(self.tax_full),
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "1" if self.is_credit else "0",
+            self.booking_text,
+            self.payment_terms,
+            str(self.account_full_tax) if self.account_full_tax is not None else "",
+        ]
+
+
+# =============================================================================
 # Open Item (Offener Posten) - OPEN_ITEM
 # =============================================================================
 
