@@ -98,7 +98,7 @@ def _render_reportlab_pdf(invoice_data: InvoiceData, config: CollmexConfig, logo
 
 
 def _draw_header(pdf: canvas.Canvas, width: float, height: float, config: CollmexConfig, logo_path: Path) -> None:
-    if logo_path.exists() and ImageReader is not None:
+    if logo_path.exists():
         logo_width = 55 * mm
         logo_height = logo_width * 197 / 558
         pdf.drawImage(
@@ -138,7 +138,7 @@ def _draw_recipient_and_metadata(pdf: canvas.Canvas, width: float, height: float
         invoice_data.address_line1,
         f"{invoice_data.postal_code} {invoice_data.city}",
         invoice_data.country,
-        _prefixed("MwSt. No.: ", invoice_data.vat_number),
+        _prefixed("USt-IdNr.: ", invoice_data.vat_number),
     ]
 
     pdf.setFont("Helvetica", 10)
@@ -149,13 +149,13 @@ def _draw_recipient_and_metadata(pdf: canvas.Canvas, width: float, height: float
     metadata_x = width - 70 * mm
     metadata_y = height - 95 * mm
     pdf.setFont("Helvetica", 10)
-    pdf.drawString(metadata_x, metadata_y, f"Date: {invoice_data.invoice_date}")
+    pdf.drawString(metadata_x, metadata_y, f"Datum: {invoice_data.invoice_date}")
     metadata_y -= 12 * mm
     pdf.setFont("Helvetica-Bold", 16)
     pdf.drawString(metadata_x, metadata_y, "Rechnung")
     metadata_y -= 8 * mm
     pdf.setFont("Helvetica", 10)
-    pdf.drawString(metadata_x, metadata_y, f"Invoice number: {invoice_data.invoice_nr}")
+    pdf.drawString(metadata_x, metadata_y, f"Rechnungs-Nr.: {invoice_data.invoice_nr}")
     metadata_y -= 5 * mm
     if invoice_data.delivery_date:
         pdf.drawString(metadata_x, metadata_y, f"Lieferdatum: {invoice_data.delivery_date}")
@@ -180,7 +180,7 @@ def _draw_line_items(pdf: canvas.Canvas, height: float, invoice_data: InvoiceDat
     amount_x = right
 
     pdf.setFont("Helvetica-Bold", 9)
-    pdf.drawString(left, y, "Description")
+    pdf.drawString(left, y, "Bezeichnung")
     pdf.drawRightString(quantity_x, y, "Menge")
     pdf.drawRightString(price_x, y, "Preis")
     pdf.drawRightString(amount_x, y, "Summe")
@@ -223,7 +223,7 @@ def _draw_summary_and_notes(pdf: canvas.Canvas, width: float, y: float, invoice_
     if invoice_data.due_date:
         pdf.drawString(25 * mm, y, f"Zahlbar bis {invoice_data.due_date} ohne Abzug auf unser unten angegebenes Konto.")
         y -= 5 * mm
-    pdf.drawString(25 * mm, y, "Wir bedanken uns für das entgegen gebrachte Vertrauen.")
+    pdf.drawString(25 * mm, y, "Wir bedanken uns für das entgegengebrachte Vertrauen.")
     return y
 
 
