@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from datetime import date
-import json
 import subprocess
 
 
@@ -20,11 +19,15 @@ class TimingResult:
 
 def run_applescript(script: str) -> str:
     """Run osascript with the given AppleScript. Raises RuntimeError on failure."""
-    result = subprocess.run(
-        ["osascript", "-e", script],
-        capture_output=True,
-        text=True,
-    )
+    try:
+        result = subprocess.run(
+            ["osascript", "-e", script],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except subprocess.TimeoutExpired:
+        raise RuntimeError("AppleScript timed out after 30 seconds")
     if result.returncode != 0:
         raise RuntimeError(f"AppleScript failed: {result.stderr.strip()}")
     return result.stdout.strip()
@@ -45,13 +48,18 @@ def query_timing_entries(
     for line in output.splitlines():
         if not line:
             continue
-        project_name, duration_text = line.rsplit("|", 1)
+        parts = line.rsplit("|", 1)
+        if len(parts) != 2:
+            unassigned.append(f"[malformed entry]: {line}")
+            continue
+        project_name, duration_text = parts
         seconds = float(duration_text)
         if "/" not in project_name:
             unassigned.append(f"{project_name}: {seconds / 3600:g}h")
             continue
         project_customer, description = project_name.split("/", 1)
         if project_customer.casefold() != customer.casefold():
+            # Different customer — not unassignable, just not relevant for this invoice run.
             continue
         hours_by_description[description] = hours_by_description.get(description, 0.0) + (
             seconds / 3600
