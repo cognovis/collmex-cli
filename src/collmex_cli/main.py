@@ -1058,6 +1058,8 @@ def create_customer_zugferd(
         output_path = Path(output)
         output_path.write_bytes(output_content)
         console.print(f"[green]ZUGFeRD PDF saved to {output_path}[/green]")
+    except typer.Exit:
+        raise
     except Exception as e:
         handle_error(e)
 
