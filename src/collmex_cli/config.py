@@ -34,6 +34,12 @@ class CollmexConfig(BaseSettings):
     Optional - Buyer info (your company, for ZUGFeRD):
         buyer_name, buyer_street, buyer_zip, buyer_city,
         buyer_country, buyer_vat_id, buyer_email
+
+    Optional - Seller info (cognovis as seller, for customer invoices):
+        seller_name, seller_street, seller_zip, seller_city,
+        seller_country, seller_phone, seller_fax, seller_web, seller_email,
+        seller_vat_id, seller_hrb, seller_amtsgericht, seller_geschaeftsfuehrung,
+        seller_bank_name, seller_iban, seller_bic
     """
 
     model_config = SettingsConfigDict(
@@ -81,6 +87,29 @@ class CollmexConfig(BaseSettings):
     buyer_vat_id: str | None = Field(default=None, description="Your VAT ID (USt-IdNr)")
     buyer_email: str | None = Field(default=None, description="Your contact email")
 
+    # ==========================================================================
+    # Seller information (optional, for customer invoice rendering)
+    # ==========================================================================
+    seller_name: str | None = Field(default=None, description="Seller company name")
+    seller_street: str | None = Field(default=None, description="Seller street address")
+    seller_zip: str | None = Field(default=None, description="Seller postal code")
+    seller_city: str | None = Field(default=None, description="Seller city")
+    seller_country: str = Field(default="DE", description="Seller country code")
+    seller_phone: str | None = Field(default=None, description="Seller phone number")
+    seller_fax: str | None = Field(default=None, description="Seller fax number")
+    seller_web: str | None = Field(default=None, description="Seller website URL")
+    seller_email: str | None = Field(default=None, description="Seller contact email")
+    seller_vat_id: str | None = Field(default=None, description="Seller VAT ID (USt-IdNr)")
+    seller_hrb: str | None = Field(default=None, description="Seller HRB number (Handelsregisternummer)")
+    seller_amtsgericht: str | None = Field(default=None, description="Seller Amtsgericht (court of registration)")
+    seller_geschaeftsfuehrung: str | None = Field(
+        default=None,
+        description="Seller Geschäftsführung (managing directors)",
+    )
+    seller_bank_name: str | None = Field(default=None, description="Seller bank name")
+    seller_iban: str | None = Field(default=None, description="Seller IBAN")
+    seller_bic: str | None = Field(default=None, description="Seller BIC")
+
     @property
     def api_url(self) -> str:
         """Return the Collmex API endpoint URL."""
@@ -95,6 +124,36 @@ class CollmexConfig(BaseSettings):
     def buyer_configured(self) -> bool:
         """Check if buyer info is configured."""
         return all([self.buyer_name, self.buyer_street, self.buyer_zip, self.buyer_city])
+
+    @property
+    def seller_configured(self) -> bool:
+        """Check if all mandatory seller fields for invoice rendering are configured."""
+        return all(
+            [
+                self.seller_name,
+                self.seller_street,
+                self.seller_zip,
+                self.seller_city,
+                self.seller_vat_id,
+                self.seller_hrb,
+                self.seller_iban,
+                self.seller_bic,
+            ]
+        )
+
+    def validate_seller_fields(self) -> list[str]:
+        """Return list of missing mandatory seller fields."""
+        required = {
+            "seller_name": self.seller_name,
+            "seller_street": self.seller_street,
+            "seller_zip": self.seller_zip,
+            "seller_city": self.seller_city,
+            "seller_vat_id": self.seller_vat_id,
+            "seller_hrb": self.seller_hrb,
+            "seller_iban": self.seller_iban,
+            "seller_bic": self.seller_bic,
+        }
+        return [k for k, v in required.items() if not v]
 
 
 def _load_toml_credentials() -> dict[str, str]:

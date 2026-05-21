@@ -6,8 +6,16 @@
 - **CMXUMS model**: `CustomerInvoice` Pydantic model that serialises to the CMXUMS CSV format, creating a receivable (debtor) entry and an open item for the customer automatically.
 - The new command integrates with the existing `open-items --customer` and `bookings` commands: booked invoices appear as open customer items until payment is received and are visible in booking history with debtor and revenue accounts.
 
-### Features
+### 🚀 Features
 
+- *(invoice-renderer)* Add ReportLab-based PDF renderer for cognovis customer invoices
+  - Single-page A4 layout reproducing the cognovis invoice design (logo, header, address block, line-item table, totals)
+  - Footer contains all mandatory disclosures: USt-IdNr, HRB/Amtsgericht, IBAN/BIC
+  - Handles multiple line items with quantity, unit price, and amount columns
+  - Raises `ValueError` on missing mandatory seller fields rather than producing incomplete output
+- *(config)* Extend `CollmexConfig` with seller master-data fields (`seller_name`, `seller_street`, `seller_zip`, `seller_city`, `seller_vat_id`, `seller_hrb`, `seller_iban`, `seller_bic`, and optional phone/fax/web/email/bank fields)
+  - `seller_configured` property for quick presence check
+  - `validate_seller_fields()` returns a list of missing mandatory fields
 - *(customer-invoice)* Add travel cost retrieval from MoneyMoney and manual mileage entry
   - `get_moneymoney_travel_costs(category)` calls `mm transactions --category <name> --format json` and returns a list of `TravelCostPosition` objects; raises `MissingCategoryError` if the category is unavailable or the command fails
   - `get_manual_mileage_costs()` prompts interactively for mileage entries (e.g. `2 * 750 km @ 0.38`) or flat amounts (e.g. `570 EUR`) and returns computed `TravelCostPosition` objects; empty input ends entry
