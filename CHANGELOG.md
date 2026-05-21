@@ -2,6 +2,13 @@
 
 ### Added
 
+- **`customer-invoice` skill**: Interactive agent workflow for creating outgoing cognovis invoices end-to-end.
+  - Collects billable positions from Timing.app (`query_timing_entries`) and travel costs from MoneyMoney or manual mileage entry.
+  - Calls `collmex customer-zugferd-create` to generate a ZUGFeRD PDF/A-3 and sidecar XML, then books the invoice via `collmex customer-invoice`.
+  - Creates two visible Apple Mail drafts (customer copy and Steuerberater Koch) — no automatic sending.
+  - Invoice number scheme `I<YYYY>_<MM>_<NNNN>` (e.g. `I2026_05_0001`); `invoice_number.py` scans the Kunden directory to determine the next sequential number.
+  - `google-invoice` skill is unchanged; the new skill explicitly guards against accidental modification.
+
 - **`customer-zugferd-create` command**: Generate a cognovis customer invoice as a ZUGFeRD-compliant PDF/A-3 file embedding EN16931 XML.
   - Seller is always cognovis (VAT ID DE118620281); buyer master data is fetched from Collmex by `--customer-id`.
   - Accepts `--invoice`, `--date`, `--items` (JSON line-item array with `description`, `quantity`, `unit_price`, `vat_rate`), and `--output` (PDF path).
