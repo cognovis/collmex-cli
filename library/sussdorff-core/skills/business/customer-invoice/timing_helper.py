@@ -40,15 +40,19 @@ def query_timing_entries(
     script = _build_timing_script(start_date, end_date)
     output = run_applescript(script)
     hours_by_description: dict[str, float] = {}
+    unassigned: list[str] = []
 
     for line in output.splitlines():
         if not line:
             continue
         project_name, duration_text = line.rsplit("|", 1)
+        seconds = float(duration_text)
+        if "/" not in project_name:
+            unassigned.append(f"{project_name}: {seconds / 3600:g}h")
+            continue
         project_customer, description = project_name.split("/", 1)
         if project_customer.casefold() != customer.casefold():
             continue
-        seconds = float(duration_text)
         hours_by_description[description] = hours_by_description.get(description, 0.0) + (
             seconds / 3600
         )
@@ -68,7 +72,7 @@ def query_timing_entries(
             f"No time entries found for customer '{customer}' "
             f"from {start_date.isoformat()} to {end_date.isoformat()}."
         )
-    return TimingResult(positions=positions, unassigned=[], notice=notice)
+    return TimingResult(positions=positions, unassigned=unassigned, notice=notice)
 
 
 def to_dict(result: TimingResult) -> dict:
