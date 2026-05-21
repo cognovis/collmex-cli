@@ -53,7 +53,11 @@ def query_timing_entries(
             unassigned.append(f"[malformed entry]: {line}")
             continue
         project_name, duration_text = parts
-        seconds = float(duration_text)
+        try:
+            seconds = float(duration_text)
+        except ValueError:
+            unassigned.append(f"[malformed duration]: {line}")
+            continue
         if "/" not in project_name:
             unassigned.append(f"{project_name}: {seconds / 3600:g}h")
             continue
@@ -103,6 +107,9 @@ tell application "TimingHelper"
     end if
     set startDate to date "{start_date.isoformat()}"
     set endDate to date "{end_date.isoformat()}"
+    set hours of endDate to 23
+    set minutes of endDate to 59
+    set seconds of endDate to 59
     set timeSummary to get time summary between startDate and endDate
     set projectTimes to get times per project of timeSummary
     set resultList to {{}}
