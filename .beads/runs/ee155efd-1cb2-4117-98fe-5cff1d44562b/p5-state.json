@@ -1,0 +1,38 @@
+{
+  "run_id": "ee155efd-1cb2-4117-98fe-5cff1d44562b",
+  "bead_id": "collmex-cli-rg8",
+  "adapter": "codex-impl",
+  "phase": "p5",
+  "checkpoint": "completed",
+  "iteration": 1,
+  "models": {
+    "impl": null,
+    "reviewer": null
+  },
+  "verdicts": [],
+  "pre_impl_sha": "c4284a5a41b4ba8fabac8ae04dabeb22215f053f",
+  "post_impl_sha": "e396d5e73177b86deab037bf72f559a7b719d5de",
+  "completion_report": {
+    "bead_id": "collmex-cli-rg8",
+    "run_id": "ee155efd-1cb2-4117-98fe-5cff1d44562b",
+    "adapter": "codex-impl",
+    "status": "partial",
+    "summary": "Partial: 5 commit(s) produced but worktree is dirty (e396d5e7)",
+    "criteria_results": [],
+    "commit_sha": "e396d5e73177b86deab037bf72f559a7b719d5de",
+    "head_advanced": true,
+    "test_output": "",
+    "errors": [
+      "## PARTIAL_REASON: worktree_dirty"
+    ],
+    "meta": {
+      "contract_version": "1",
+      "producer": "codex-impl",
+      "generated_at": "2026-05-21T10:07:29.970018+00:00"
+    },
+    "commits": 5,
+    "worktree_dirty": true
+  },
+  "created_at": "2026-05-21T10:01:06.938911+00:00",
+  "updated_at": "2026-05-21T10:07:29.970132+00:00"
+}
