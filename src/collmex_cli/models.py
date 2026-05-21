@@ -463,8 +463,6 @@ class VendorInvoice(CollmexRecord):
         if isinstance(v, (int, float)):
             v = str(int(v))
         if isinstance(v, str):
-            if "-" in v:
-                return date.fromisoformat(v)
             return parse_collmex_date(v)
         return None
 
