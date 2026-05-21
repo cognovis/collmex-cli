@@ -7,6 +7,11 @@
   - `get_manual_mileage_costs()` prompts interactively for mileage entries (e.g. `2 * 750 km @ 0.38`) or flat amounts (e.g. `570 EUR`) and returns computed `TravelCostPosition` objects; empty input ends entry
   - `get_travel_cost_positions(category)` combines both sources into a single list
   - All error paths (mm unavailable, category not found, JSON parse error) surface as `MissingCategoryError` — no silent data loss
+- *(customer-invoice)* Add `TimingHelper` integration to extract billable hours per customer from the Timing app via AppleScript
+  - `query_timing_entries(customer, start_date, end_date, hourly_rate)` returns aggregated invoice positions (description, hours, hourly_rate) and a list of unassignable entries
+  - Customer assignment resolved via Timing project hierarchy (`Customer/Description` path)
+  - Time entries that cannot be attributed to a customer are reported in `unassigned`, not silently discarded
+  - An empty period returns an empty positions list with a descriptive notice instead of raising an error
 
 ## [2026.03.8] - 2026-03-06
 
