@@ -72,7 +72,7 @@ def test_renders_pdf(tmp_path):
 
     assert pdf_bytes.startswith(b"%PDF")
     assert output_path.read_bytes() == pdf_bytes
-    assert pdf_bytes.count(b"/Type /Page") == 1
+    assert b"/Count 1" in pdf_bytes
 
 
 def test_layout_contains_template_sections():
