@@ -753,7 +753,6 @@ def create_customer_invoice(
     tax_amount: Annotated[float | None, typer.Option("--tax", help="Tax amount")] = None,
     booking_text: Annotated[str | None, typer.Option("--text", "-t", help="Booking text")] = None,
     account: Annotated[int, typer.Option("--account", "-a", help="Revenue account")] = 8400,
-    due_date: Annotated[str | None, typer.Option("--due", help="Due date (YYYY-MM-DD)")] = None,
     json_output: Annotated[bool, typer.Option("--json", "-j", help="Output as JSON")] = False,
 ) -> None:
     """Create a customer invoice in accounting without the invoicing module."""
@@ -773,7 +772,6 @@ def create_customer_invoice(
             net_amount_full_tax=net,
             tax_full=tax,
             booking_text=booking_text or "",
-            payment_terms=due_date or "",
             account_full_tax=account,
         )
 

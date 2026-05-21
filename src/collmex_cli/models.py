@@ -513,8 +513,6 @@ class CustomerInvoice(CollmexRecord):
     invoice_number: str = Field(default="", description="Invoice number (unique)")
     net_amount_full_tax: Decimal | None = Field(default=None, description="Net amount full VAT rate")
     tax_full: Decimal | None = Field(default=None, description="Tax amount full VAT")
-    net_amount_reduced_tax: Decimal | None = Field(default=None, description="Net amount reduced VAT rate")
-    tax_reduced: Decimal | None = Field(default=None, description="Tax amount reduced VAT")
     is_credit: bool = Field(default=False, description="True if credit note")
     booking_text: str = Field(default="", description="Booking text")
     payment_terms: str = Field(default="", description="Payment terms or due date")
@@ -543,8 +541,8 @@ class CustomerInvoice(CollmexRecord):
             self.invoice_number,
             format_collmex_decimal(self.net_amount_full_tax),
             format_collmex_decimal(self.tax_full),
-            format_collmex_decimal(self.net_amount_reduced_tax),
-            format_collmex_decimal(self.tax_reduced),
+            "",
+            "",
             "",
             "",
             "",
