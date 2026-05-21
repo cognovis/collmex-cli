@@ -15,7 +15,15 @@ from . import __version__
 from .api import CollmexAuthError, CollmexError
 from .app_config import load_config
 from .client import CollmexClient
-from .models import AccountBalance, Customer, Invoice, InvoicePayment, Vendor, VendorInvoice
+from .models import (
+    AccountBalance,
+    Customer,
+    CustomerInvoice,
+    Invoice,
+    InvoicePayment,
+    Vendor,
+    VendorInvoice,
+)
 
 
 def check_for_update() -> None:
@@ -726,6 +734,60 @@ def list_unmatched(
             )
             console.print(f"\n[dim]Total: {len(unmatched)} unmatched transactions[/dim]")
             console.print("[yellow]These entries need receipts/invoices to be matched.[/yellow]")
+    except Exception as e:
+        handle_error(e)
+
+
+# =============================================================================
+# Customer Invoice Commands
+# =============================================================================
+
+
+@app.command("customer-invoice")
+def create_customer_invoice(
+    customer_id: Annotated[int, typer.Option("--customer-id", "-c", help="Customer ID")],
+    invoice_number: Annotated[str, typer.Option("--invoice", "-i", help="Invoice number")],
+    invoice_date: Annotated[str, typer.Option("--date", "-d", help="Invoice date (YYYY-MM-DD)")],
+    net_amount: Annotated[float, typer.Option("--net", "-n", help="Net amount (full VAT rate)")],
+    tax_rate: Annotated[float, typer.Option("--tax-rate", help="VAT rate")] = 19.0,
+    tax_amount: Annotated[float | None, typer.Option("--tax", help="Tax amount")] = None,
+    booking_text: Annotated[str | None, typer.Option("--text", "-t", help="Booking text")] = None,
+    account: Annotated[int, typer.Option("--account", "-a", help="Revenue account")] = 8400,
+    due_date: Annotated[str | None, typer.Option("--due", help="Due date (YYYY-MM-DD)")] = None,
+    json_output: Annotated[bool, typer.Option("--json", "-j", help="Output as JSON")] = False,
+) -> None:
+    """Create a customer invoice in accounting without the invoicing module."""
+    try:
+        inv_date = date.fromisoformat(invoice_date)
+        net = Decimal(str(net_amount))
+        tax = (
+            Decimal(str(tax_amount))
+            if tax_amount is not None
+            else (net * Decimal(str(tax_rate)) / Decimal("100")).quantize(Decimal("0.01"))
+        )
+
+        invoice = CustomerInvoice(
+            customer_id=customer_id,
+            invoice_number=invoice_number,
+            invoice_date=inv_date,
+            net_amount_full_tax=net,
+            tax_full=tax,
+            booking_text=booking_text or "",
+            payment_terms=due_date or "",
+            account_full_tax=account,
+        )
+
+        with CollmexClient() as client:
+            result = client.create_customer_invoice(invoice)
+
+        if json_output:
+            output_json({"status": "created", "invoice": invoice.model_dump(), "response": result})
+        else:
+            console.print("[green]Customer invoice created successfully[/green]")
+            console.print(f"Customer: {customer_id}")
+            console.print(f"Invoice: {invoice_number}")
+            console.print(f"Amount: {net} EUR (net)")
+            console.print(f"Tax: {tax} EUR")
     except Exception as e:
         handle_error(e)
 

@@ -8,6 +8,7 @@ from .models import (
     AccountBalance,
     AccountingDocument,
     Customer,
+    CustomerInvoice,
     Invoice,
     InvoicePayment,
     OpenItem,
@@ -297,6 +298,14 @@ class CollmexClient:
         Returns:
             Raw API response rows
         """
+        return self.api.request(invoice.to_csv_row())
+
+    # =========================================================================
+    # Customer Invoices
+    # =========================================================================
+
+    def create_customer_invoice(self, invoice: CustomerInvoice) -> list[str]:
+        """Create a customer invoice (books revenue in accounting)."""
         return self.api.request(invoice.to_csv_row())
 
     # =========================================================================
