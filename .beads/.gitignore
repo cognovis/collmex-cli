@@ -30,6 +30,18 @@ ephemeral.sqlite3-shm
 dolt-server.pid
 dolt-server.log
 dolt-server.lock
+dolt-server.port
+dolt-server.activity
+dolt-monitor.pid
+dolt-monitor.pid.lock
+dolt-config.log
+
+# Local configuration (machine-specific, not shared across clones)
+metadata.json
+metadata.json.tmp
+
+# Backup data (auto-exported JSONL, local-only)
+backup/
 
 # Legacy files (from pre-Dolt versions)
 *.db
@@ -39,11 +51,13 @@ dolt-server.lock
 *.db-shm
 db.sqlite
 bd.db
-daemon.lock
-daemon.log
-daemon-*.log.gz
-daemon.pid
 # NOTE: Do NOT add negation patterns here.
 # They would override fork protection in .git/info/exclude.
 # Config files (metadata.json, config.yaml) are tracked by git by default
 # since no pattern above ignores them.
+
+# Agent audit log (local-only)
+interactions.jsonl
+
+# Migration hints (temporary, per-machine)
+.migration-hint-*
