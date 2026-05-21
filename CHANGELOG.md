@@ -1,5 +1,16 @@
 ## [Unreleased]
 
+### Added
+
+- **`customer-zugferd-create` command**: Generate a cognovis customer invoice as a ZUGFeRD-compliant PDF/A-3 file embedding EN16931 XML.
+  - Seller is always cognovis (VAT ID DE118620281); buyer master data is fetched from Collmex by `--customer-id`.
+  - Accepts `--invoice`, `--date`, `--items` (JSON line-item array with `description`, `quantity`, `unit_price`, `vat_rate`), and `--output` (PDF path).
+  - Optional: `--delivery-date`, `--due`, `--payment-terms`, `--project-ref`, `--notes`, `--cost-note`, `--vat-note`.
+  - Multi-line invoices with hours and travel expenses are supported; totals use `Decimal` arithmetic to avoid floating-point rounding errors.
+  - factur-x schematron validation runs automatically — clear error messages for EN16931 violations.
+  - Raises a descriptive error listing missing fields when required seller or buyer master data is absent.
+  - ZUGFeRD XML is embedded via `facturx.generate_from_binary` with `AFRelationship=Alternative` (ZUGFeRD 2.x Comfort profile).
+
 ### Fixed
 
 - *(zugferd)* Fix PaymentMeans `payee_account` Container API usage — crash when vendor has IBAN (`collmex-cli-983`)

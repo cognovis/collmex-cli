@@ -135,6 +135,44 @@ collmex customer-invoice --customer-id 10001 --invoice "RE-2024-044" \
 
 After booking, the invoice appears in `open-items --customer` until payment is received and in `bookings` with the debtor and revenue accounts.
 
+### ZUGFeRD Customer Invoice (PDF/A-3 with embedded XML)
+
+Generate a ZUGFeRD-compliant PDF/A-3 invoice with embedded EN16931 XML. Seller is always
+cognovis (VAT ID DE118620281); buyer master data is fetched from Collmex by customer ID.
+
+```bash
+collmex customer-zugferd-create \
+  --customer-id 10001 \
+  --invoice "RE-2026-042" \
+  --date 2026-05-21 \
+  --items '[
+    {"description": "Consulting May 2026", "quantity": 8, "unit_price": 150.00, "vat_rate": 19},
+    {"description": "Travel expenses", "quantity": 1, "unit_price": 42.50, "vat_rate": 19}
+  ]' \
+  --output rechnung-RE-2026-042.pdf
+
+# With optional metadata
+collmex customer-zugferd-create \
+  --customer-id 10001 \
+  --invoice "RE-2026-042" \
+  --date 2026-05-21 \
+  --items '[{"description": "Consulting", "quantity": 8, "unit_price": 150.00, "vat_rate": 19}]' \
+  --output rechnung.pdf \
+  --delivery-date 2026-05-31 \
+  --due 2026-06-14 \
+  --payment-terms "Zahlbar innerhalb von 14 Tagen" \
+  --project-ref "Projekt XYZ" \
+  --notes "Gemäß Rahmenvertrag vom 01.01.2026"
+```
+
+The output file is a PDF/A-3 with the ZUGFeRD XML (`factur-x.xml`) attached as
+`AFRelationship=Alternative`. It passes EN16931 schematron validation automatically;
+missing seller or buyer master-data fields produce a clear error listing the affected
+fields before any file is written.
+
+Seller master data must be present in `CollmexConfig` (env vars starting with
+`COLLMEX_SELLER_`). See the *Seller master data* section under Configuration above.
+
 ### Vendor Invoices (Lieferantenrechnungen)
 
 ```bash
