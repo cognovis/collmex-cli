@@ -39,7 +39,7 @@ def query_timing_entries(
     """Query Timing app for billable hours for the given customer and date range."""
     script = _build_timing_script(start_date, end_date)
     output = run_applescript(script)
-    positions: list[InvoicePosition] = []
+    hours_by_description: dict[str, float] = {}
 
     for line in output.splitlines():
         if not line:
@@ -49,13 +49,18 @@ def query_timing_entries(
         if project_customer.casefold() != customer.casefold():
             continue
         seconds = float(duration_text)
-        positions.append(
-            InvoicePosition(
-                description=description,
-                hours=seconds / 3600,
-                hourly_rate=hourly_rate,
-            )
+        hours_by_description[description] = hours_by_description.get(description, 0.0) + (
+            seconds / 3600
         )
+
+    positions = [
+        InvoicePosition(
+            description=description,
+            hours=hours,
+            hourly_rate=hourly_rate,
+        )
+        for description, hours in hours_by_description.items()
+    ]
 
     notice = None
     if not positions:
