@@ -23,6 +23,28 @@ export COLLMEX_USERNAME="your_username"
 export COLLMEX_PASSWORD="your_password"
 ```
 
+### Seller master data (required for PDF invoice rendering)
+
+```bash
+export COLLMEX_SELLER_NAME="cognovis GmbH"
+export COLLMEX_SELLER_STREET="Musterstraße 1"
+export COLLMEX_SELLER_ZIP="12345"
+export COLLMEX_SELLER_CITY="Berlin"
+export COLLMEX_SELLER_VAT_ID="DE123456789"
+export COLLMEX_SELLER_HRB="HRB 12345"
+export COLLMEX_SELLER_IBAN="DE00 1234 5678 9012 3456 78"
+export COLLMEX_SELLER_BIC="BELADEBEXXX"
+
+# Optional
+export COLLMEX_SELLER_AMTSGERICHT="Amtsgericht Berlin-Charlottenburg"
+export COLLMEX_SELLER_GESCHAEFTSFUEHRUNG="Max Mustermann"
+export COLLMEX_SELLER_PHONE="+49 30 123456"
+export COLLMEX_SELLER_FAX="+49 30 123457"
+export COLLMEX_SELLER_WEB="https://www.cognovis.de"
+export COLLMEX_SELLER_EMAIL="info@cognovis.de"
+export COLLMEX_SELLER_BANK_NAME="Deutsche Bank"
+```
+
 ## Usage
 
 ### Test Connection
@@ -100,6 +122,42 @@ collmex vendor-invoice \
   --net 100.00 \
   --text "Office supplies"
 ```
+
+### Invoice PDF Rendering
+
+Generate a cognovis-layout PDF from structured invoice data:
+
+```python
+from collmex_cli.invoice_renderer import render_invoice, InvoiceData, InvoiceLineItem
+
+data = InvoiceData(
+    company_name="Acme GmbH",
+    company_contact_name="Jane Doe",
+    address_line1="Hauptstraße 5",
+    postal_code="10115",
+    city="Berlin",
+    country="DE",
+    vat_number="DE987654321",
+    invoice_nr="2026-0042",
+    invoice_date="21.05.2026",
+    delivery_date="21.05.2026",
+    project_ref="Projekt XYZ",
+    line_items=[
+        InvoiceLineItem(name="Beratung", quantity="8 h", unit_price="150,00 €", amount="1.200,00 €"),
+    ],
+    subtotal="1.200,00 €",
+    vat_rate="19%",
+    vat_amount="228,00 €",
+    total="1.428,00 €",
+)
+
+pdf_bytes = render_invoice(data)
+with open("rechnung.pdf", "wb") as f:
+    f.write(pdf_bytes)
+```
+
+Seller master data is read from `CollmexConfig`. Missing mandatory fields raise a `ValueError`
+listing the affected field names.
 
 ## LLM Integration
 

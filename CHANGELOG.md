@@ -1,3 +1,16 @@
+## [Unreleased]
+
+### 🚀 Features
+
+- *(invoice-renderer)* Add ReportLab-based PDF renderer for cognovis customer invoices
+  - Single-page A4 layout reproducing the cognovis invoice design (logo, header, address block, line-item table, totals)
+  - Footer contains all mandatory disclosures: USt-IdNr, HRB/Amtsgericht, IBAN/BIC
+  - Handles multiple line items with quantity, unit price, and amount columns
+  - Raises `ValueError` on missing mandatory seller fields rather than producing incomplete output
+- *(config)* Extend `CollmexConfig` with seller master-data fields (`seller_name`, `seller_street`, `seller_zip`, `seller_city`, `seller_vat_id`, `seller_hrb`, `seller_iban`, `seller_bic`, and optional phone/fax/web/email/bank fields)
+  - `seller_configured` property for quick presence check
+  - `validate_seller_fields()` returns a list of missing mandatory fields
+
 ## [2026.03.8] - 2026-03-06
 
 ### 🐛 Bug Fixes
