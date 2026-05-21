@@ -986,6 +986,10 @@ def create_customer_zugferd(
     output: Annotated[str, typer.Option("--output", "-o", help="Output PDF/A-3 file path")],
     delivery_date: Annotated[str | None, typer.Option("--delivery-date", help="Delivery date (YYYY-MM-DD)")] = None,
     due_date: Annotated[str | None, typer.Option("--due", help="Payment due date (YYYY-MM-DD)")] = None,
+    payment_terms: Annotated[
+        str,
+        typer.Option("--payment-terms", help="Payment terms text for the ZUGFeRD XML"),
+    ] = "Zahlbar innerhalb von 14 Tagen ohne Abzug.",
     project_ref: Annotated[str | None, typer.Option("--project-ref", help="Customer project or purchase reference")] = None,
     notes: Annotated[str | None, typer.Option("--notes", help="Additional XML notes")] = None,
     cost_note: Annotated[str | None, typer.Option("--cost-note", help="Cost note for the visible invoice")] = None,
@@ -1032,6 +1036,8 @@ def create_customer_zugferd(
             invoice_date=inv_date,
             line_items=line_items,
             config=config,
+            delivery_date=delivery,
+            payment_terms_text=payment_terms,
             due_date=payment_due,
             notes=notes,
         )

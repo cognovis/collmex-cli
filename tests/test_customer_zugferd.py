@@ -10,6 +10,7 @@ import xml.etree.ElementTree as ET
 from unittest.mock import patch
 
 import pytest
+from facturx import xml_check_schematron
 from pypdf import PdfReader
 from typer.testing import CliRunner
 
@@ -185,7 +186,7 @@ def test_seller_buyer_roles(tmp_path):
 
 
 def test_xml_validates_en16931():
-    """Customer ZUGFeRD XML serializes with the EN16931 drafthorse schema."""
+    """Customer ZUGFeRD XML passes EN16931 schema and schematron validation."""
     xml_bytes = create_customer_zugferd_xml(
         customer=_customer(),
         invoice_number="I2026_05_0001",
@@ -197,6 +198,7 @@ def test_xml_validates_en16931():
     root = _xml_root(xml_bytes)
     assert root.tag.endswith("CrossIndustryInvoice")
     assert "urn:cen.eu:en16931:2017" in _xml_text(xml_bytes)
+    assert xml_check_schematron(xml_bytes, flavor="factur-x", level="en16931") is True
 
 
 def test_output_pdfa3_embedded_xml():

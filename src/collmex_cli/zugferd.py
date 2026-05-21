@@ -5,7 +5,7 @@ Uses python-drafthorse to generate EN 16931 compliant XML.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from io import BytesIO
 from pathlib import Path
@@ -66,6 +66,7 @@ def create_customer_zugferd_xml(
     invoice_date: date,
     line_items: list[dict],
     config: CollmexConfig | None = None,
+    delivery_date: date | None = None,
     payment_terms_text: str | None = None,
     due_date: date | None = None,
     notes: str | None = None,
@@ -80,6 +81,7 @@ def create_customer_zugferd_xml(
     doc.header.id = invoice_number
     doc.header.type_code = "380"
     doc.header.issue_date_time = invoice_date
+    doc.trade.delivery.event.occurrence = delivery_date or invoice_date
 
     if notes:
         note = IncludedNote()
@@ -92,9 +94,6 @@ def create_customer_zugferd_xml(
     doc.trade.agreement.seller.address.city_name = config.seller_city
     doc.trade.agreement.seller.address.country_id = config.seller_country
 
-    if config.seller_email:
-        doc.trade.agreement.seller.electronic_address.uri_ID = (config.seller_email, "EM")
-
     seller_tax_reg = TaxRegistration()
     seller_tax_reg.id = ("VA", config.seller_vat_id)
     doc.trade.agreement.seller.tax_registrations.add(seller_tax_reg)
@@ -106,9 +105,6 @@ def create_customer_zugferd_xml(
     doc.trade.agreement.buyer.address.postcode = customer.zip_code
     doc.trade.agreement.buyer.address.city_name = customer.city
     doc.trade.agreement.buyer.address.country_id = customer.country or "DE"
-
-    if customer.email:
-        doc.trade.agreement.buyer.electronic_address.uri_ID = (customer.email, "EM")
 
     if customer.vat_id:
         buyer_tax_reg = TaxRegistration()
@@ -125,13 +121,13 @@ def create_customer_zugferd_xml(
     pm.payee_institution.bic = config.seller_bic
     doc.trade.settlement.payment_means.add(pm)
 
-    if payment_terms_text or due_date:
-        terms = PaymentTerms()
-        if payment_terms_text:
-            terms.description = payment_terms_text
-        if due_date:
-            terms.due = due_date
-        doc.trade.settlement.terms.add(terms)
+    due_date = due_date or invoice_date + timedelta(days=14)
+    if not payment_terms_text:
+        payment_terms_text = f"Zahlbar bis {due_date.strftime('%d.%m.%Y')}."
+    terms = PaymentTerms()
+    terms.description = payment_terms_text
+    terms.due = due_date
+    doc.trade.settlement.terms.add(terms)
 
     _add_settlement_totals(doc, total_net, tax_amounts)
 
