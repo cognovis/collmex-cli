@@ -92,3 +92,22 @@ def test_unassigned_time_reported() -> None:
         "unassigned": ["SomeProject: 0.5h"],
         "notice": None,
     }
+
+
+def test_empty_period() -> None:
+    with patch("timing_helper.run_applescript", return_value=""):
+        result = query_timing_entries(
+            "charly-server",
+            date(2026, 1, 1),
+            date(2026, 1, 31),
+            hourly_rate=130.0,
+        )
+
+    assert to_dict(result) == {
+        "positions": [],
+        "unassigned": [],
+        "notice": (
+            "No time entries found for customer 'charly-server' "
+            "from 2026-01-01 to 2026-01-31."
+        ),
+    }
