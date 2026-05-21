@@ -6,18 +6,12 @@ from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
 
-from .config import CollmexConfig, get_config
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.units import mm
+from reportlab.lib.utils import ImageReader
+from reportlab.pdfgen import canvas
 
-try:
-    from reportlab.lib.pagesizes import A4
-    from reportlab.lib.units import mm
-    from reportlab.lib.utils import ImageReader
-    from reportlab.pdfgen import canvas
-except ImportError:  # pragma: no cover - used only when the optional dependency is unavailable locally
-    A4 = (595.2755905511812, 841.8897637795277)
-    mm = 2.834645669291339
-    ImageReader = None
-    canvas = None
+from .config import CollmexConfig, get_config
 
 
 @dataclass
@@ -76,10 +70,7 @@ def render_invoice_pdf(
     validate_seller_config(seller_config)
 
     resolved_logo_path = logo_path or _default_logo_path()
-    if canvas is None:
-        pdf_bytes = _render_fallback_pdf(invoice_data, seller_config)
-    else:
-        pdf_bytes = _render_reportlab_pdf(invoice_data, seller_config, resolved_logo_path)
+    pdf_bytes = _render_reportlab_pdf(invoice_data, seller_config, resolved_logo_path)
 
     if output_path is not None:
         output_path.write_bytes(pdf_bytes)
@@ -87,9 +78,6 @@ def render_invoice_pdf(
 
 
 def _default_logo_path() -> Path:
-    project_logo = Path(__file__).parent.parent.parent / "cognovis_logo.png"
-    if project_logo.exists():
-        return project_logo
     return Path(__file__).parent / "assets" / "cognovis_logo.png"
 
 
@@ -177,6 +165,13 @@ def _draw_recipient_and_metadata(pdf: canvas.Canvas, width: float, height: float
 
 
 def _draw_line_items(pdf: canvas.Canvas, height: float, invoice_data: InvoiceData) -> float:
+    max_items = 15
+    if len(invoice_data.line_items) > max_items:
+        raise ValueError(
+            f"Invoice has {len(invoice_data.line_items)} line items but single-page renderer "
+            f"supports at most {max_items}. Split into multiple invoices."
+        )
+
     left = 25 * mm
     right = 185 * mm
     y = height - 155 * mm
@@ -228,7 +223,7 @@ def _draw_summary_and_notes(pdf: canvas.Canvas, width: float, y: float, invoice_
     if invoice_data.due_date:
         pdf.drawString(25 * mm, y, f"Zahlbar bis {invoice_data.due_date} ohne Abzug auf unser unten angegebenes Konto.")
         y -= 5 * mm
-    pdf.drawString(25 * mm, y, "Wir bedanken uns fuer das entgegen gebrachte Vertrauen.")
+    pdf.drawString(25 * mm, y, "Wir bedanken uns für das entgegen gebrachte Vertrauen.")
     return y
 
 
@@ -242,7 +237,7 @@ def _draw_footer(pdf: canvas.Canvas, width: float, config: CollmexConfig, notes_
         f"{config.seller_street} - {config.seller_zip} {config.seller_city}",
     )
     legal_parts = [
-        _prefixed("Geschaeftsfuehrung: ", config.seller_geschaeftsfuehrung),
+        _prefixed("Geschäftsführung: ", config.seller_geschaeftsfuehrung),
         config.seller_amtsgericht,
         _prefixed("HRB ", config.seller_hrb),
         _prefixed("Ust-ID: ", config.seller_vat_id),
@@ -261,96 +256,3 @@ def _prefixed(prefix: str, value: str | None) -> str | None:
     if not value:
         return None
     return f"{prefix}{value}"
-
-
-def _render_fallback_pdf(invoice_data: InvoiceData, config: CollmexConfig) -> bytes:
-    text_lines = [
-        config.seller_name,
-        config.seller_street,
-        f"{config.seller_zip} {config.seller_city}",
-        config.seller_country,
-        _prefixed("phone: ", config.seller_phone),
-        _prefixed("fax: ", config.seller_fax),
-        config.seller_email,
-        config.seller_web,
-        invoice_data.company_name,
-        invoice_data.company_contact_name,
-        invoice_data.address_line1,
-        f"{invoice_data.postal_code} {invoice_data.city}",
-        invoice_data.country,
-        _prefixed("MwSt. No.: ", invoice_data.vat_number),
-        f"Date: {invoice_data.invoice_date}",
-        "Rechnung",
-        f"Invoice number: {invoice_data.invoice_nr}",
-        _prefixed("Lieferdatum: ", invoice_data.delivery_date),
-        _prefixed("Beauftragung: ", invoice_data.project_ref),
-        "Description Menge Preis Summe",
-    ]
-    for item in invoice_data.line_items:
-        text_lines.append(f"{item.name} {item.quantity} {item.unit_price} EUR {item.amount} EUR")
-    text_lines.extend(
-        [
-            f"Zwischensumme: {invoice_data.subtotal} EUR",
-            f"{invoice_data.vat_rate} % MwSt.: {invoice_data.vat_amount} EUR",
-            f"Gesamtbetrag: {invoice_data.total} EUR",
-            invoice_data.cost_note,
-            invoice_data.vat_note,
-            _prefixed("Zahlbar bis ", invoice_data.due_date),
-            "Wir bedanken uns fuer das entgegen gebrachte Vertrauen.",
-            f"{config.seller_name} - project management solutions - "
-            f"{config.seller_street} - {config.seller_zip} {config.seller_city}",
-            " | ".join(
-                _present(
-                    [
-                        _prefixed("Geschaeftsfuehrung: ", config.seller_geschaeftsfuehrung),
-                        config.seller_amtsgericht,
-                        _prefixed("HRB ", config.seller_hrb),
-                        _prefixed("Ust-ID: ", config.seller_vat_id),
-                        _prefixed("Bankverbindung: ", config.seller_bank_name),
-                        _prefixed("IBAN: ", config.seller_iban),
-                        _prefixed("BIC-Code: ", config.seller_bic),
-                    ]
-                )
-            ),
-        ]
-    )
-    return _simple_pdf(_present(text_lines))
-
-
-def _simple_pdf(lines: list[str]) -> bytes:
-    content = ["BT", "/F1 9 Tf", "50 790 Td"]
-    for index, line in enumerate(lines):
-        if index:
-            content.append("0 -13 Td")
-        content.append(f"({_pdf_escape(line)}) Tj")
-    content.append("ET")
-    stream = "\n".join(content).encode("latin-1", errors="replace")
-    objects = [
-        b"<< /Type/Catalog /Pages 2 0 R >>",
-        b"<< /Type/Pages /Kids [3 0 R] /Count 1 >>",
-        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.2756 841.8898] "
-        b"/Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
-        b"<< /Type/Font /Subtype/Type1 /BaseFont/Helvetica >>",
-        b"<< /Length " + str(len(stream)).encode("ascii") + b" >>\nstream\n" + stream + b"\nendstream",
-    ]
-    output = BytesIO()
-    output.write(b"%PDF-1.4\n")
-    offsets = [0]
-    for number, obj in enumerate(objects, start=1):
-        offsets.append(output.tell())
-        output.write(f"{number} 0 obj\n".encode("ascii"))
-        output.write(obj)
-        output.write(b"\nendobj\n")
-    xref = output.tell()
-    output.write(f"xref\n0 {len(objects) + 1}\n".encode("ascii"))
-    output.write(b"0000000000 65535 f \n")
-    for offset in offsets[1:]:
-        output.write(f"{offset:010d} 00000 n \n".encode("ascii"))
-    output.write(
-        f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n".encode("ascii")
-    )
-    return output.getvalue()
-
-
-def _pdf_escape(text: str) -> str:
-    return text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")

@@ -58,7 +58,7 @@ def _invoice_data() -> InvoiceData:
         vat_rate="19",
         vat_amount="2.672,28",
         total="16.736,91",
-        cost_note="Reisekosten gemaess Vereinbarung.",
+        cost_note="Reisekosten gemäß Vereinbarung.",
         vat_note="Leistungsort Deutschland.",
         due_date="20.06.2026",
     )
@@ -110,6 +110,18 @@ def test_footer_pflichtangaben():
         b"DEUTDEHHXXX",
     ]:
         assert expected in pdf_bytes
+    assert b"Gesch" in pdf_bytes
+    assert b"ftsf" in pdf_bytes
+    assert b"Geschaeftsfuehrung" not in pdf_bytes
+
+
+def test_notes_use_german_umlauts():
+    """Customer-facing German note text uses proper umlauts."""
+    pdf_bytes = render_invoice_pdf(_invoice_data(), config=_seller_config())
+
+    assert b"Wir bedanken uns f" in pdf_bytes
+    assert b"fuer" not in pdf_bytes
+    assert b"gemaess" not in pdf_bytes
 
 
 def test_multiline_totals():
@@ -135,3 +147,14 @@ def test_validate_seller_config_reports_missing_fields():
     """Missing mandatory seller config fields raise a clear error."""
     with pytest.raises(ValueError, match="seller_street"):
         validate_seller_config(_seller_config(seller_street=None))
+
+
+def test_rejects_too_many_line_items_for_single_page_renderer():
+    """Invoices that cannot fit the one-page renderer fail clearly."""
+    invoice = _invoice_data()
+    invoice.line_items = [
+        InvoiceLineItem(f"Beratung {index}", "1,00 Std.", "185,00", "185,00") for index in range(16)
+    ]
+
+    with pytest.raises(ValueError, match="supports at most 15"):
+        render_invoice_pdf(invoice, config=_seller_config())
