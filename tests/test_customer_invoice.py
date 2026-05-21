@@ -21,5 +21,5 @@ class TestVatCalculation:
         row = invoice.to_csv_row()
 
         assert row[0] == "CMXUMS"
-        assert row[5] == "100.00"
-        assert row[6] == "19.00"
+        assert row[5] == "100,00"
+        assert row[6] == "19,00"
