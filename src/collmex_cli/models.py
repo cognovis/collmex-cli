@@ -526,8 +526,6 @@ class CustomerInvoice(CollmexRecord):
         if isinstance(v, (int, float)):
             v = str(int(v))
         if isinstance(v, str):
-            if "-" in v:
-                return date.fromisoformat(v)
             return parse_collmex_date(v)
         return None
 
@@ -535,7 +533,7 @@ class CustomerInvoice(CollmexRecord):
         """Convert to CSV row for creating a customer invoice."""
         return [
             self.record_type,
-            str(self.customer_id) if self.customer_id else "",
+            str(self.customer_id) if self.customer_id is not None else "",
             str(self.company_id),
             format_collmex_date(self.invoice_date),
             self.invoice_number,
@@ -552,7 +550,7 @@ class CustomerInvoice(CollmexRecord):
             "1" if self.is_credit else "0",
             self.booking_text,
             self.payment_terms,
-            str(self.account_full_tax) if self.account_full_tax else "",
+            str(self.account_full_tax) if self.account_full_tax is not None else "",
         ]
 
 

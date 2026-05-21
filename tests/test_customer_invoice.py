@@ -22,7 +22,7 @@ class TestVatCalculation:
         invoice = CustomerInvoice(
             customer_id=123,
             invoice_number="I2026_05_0001",
-            invoice_date="2026-05-21",
+            invoice_date=date(2026, 5, 21),
             net_amount_full_tax=Decimal("100.00"),
             tax_full=Decimal("19.00"),
         )
