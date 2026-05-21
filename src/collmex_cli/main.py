@@ -977,6 +977,135 @@ def create_zugferd(
         handle_error(e)
 
 
+@app.command("customer-zugferd-create")
+def create_customer_zugferd(
+    customer_id: Annotated[int, typer.Option("--customer-id", "-c", help="Customer ID from Collmex")],
+    invoice_number: Annotated[str, typer.Option("--invoice", "-i", help="Invoice number")],
+    invoice_date: Annotated[str, typer.Option("--date", "-d", help="Invoice date (YYYY-MM-DD)")],
+    items: Annotated[str, typer.Option("--items", help="JSON list of invoice line items")],
+    output: Annotated[str, typer.Option("--output", "-o", help="Output PDF/A-3 file path")],
+    delivery_date: Annotated[str | None, typer.Option("--delivery-date", help="Delivery date (YYYY-MM-DD)")] = None,
+    due_date: Annotated[str | None, typer.Option("--due", help="Payment due date (YYYY-MM-DD)")] = None,
+    payment_terms: Annotated[
+        str,
+        typer.Option("--payment-terms", help="Payment terms text for the ZUGFeRD XML"),
+    ] = "Zahlbar innerhalb von 14 Tagen ohne Abzug.",
+    project_ref: Annotated[str | None, typer.Option("--project-ref", help="Customer project or purchase reference")] = None,
+    notes: Annotated[str | None, typer.Option("--notes", help="Additional XML notes")] = None,
+    cost_note: Annotated[str | None, typer.Option("--cost-note", help="Cost note for the visible invoice")] = None,
+    vat_note: Annotated[str | None, typer.Option("--vat-note", help="VAT note for the visible invoice")] = None,
+) -> None:
+    """Generate a cognovis customer invoice as ZUGFeRD PDF/A-3."""
+    from pathlib import Path
+
+    from .config import get_config
+    from .invoice_renderer import render_invoice_pdf
+    from .zugferd import (
+        create_customer_invoice_data,
+        create_customer_zugferd_xml,
+        embed_xml_in_pdf,
+        validate_customer_for_zugferd,
+    )
+
+    try:
+        inv_date = date.fromisoformat(invoice_date)
+        delivery = date.fromisoformat(delivery_date) if delivery_date else inv_date
+        payment_due = date.fromisoformat(due_date) if due_date else None
+        line_items = _parse_customer_zugferd_items(items)
+        config = get_config()
+
+        with CollmexClient() as client:
+            customers = client.get_customers(customer_id=customer_id)
+
+        if not customers:
+            err_console.print(f"[red]Customer {customer_id} not found[/red]")
+            raise typer.Exit(1)
+
+        customer = customers[0]
+        missing = validate_customer_for_zugferd(customer)
+        if missing:
+            err_console.print(
+                f"[red]Error:[/red] Customer {customer_id} is missing required fields for ZUGFeRD: "
+                + ", ".join(missing)
+            )
+            raise typer.Exit(1)
+
+        xml_content = create_customer_zugferd_xml(
+            customer=customer,
+            invoice_number=invoice_number,
+            invoice_date=inv_date,
+            line_items=line_items,
+            config=config,
+            delivery_date=delivery,
+            payment_terms_text=payment_terms,
+            due_date=payment_due,
+            notes=notes,
+        )
+        invoice_data = create_customer_invoice_data(
+            customer=customer,
+            invoice_number=invoice_number,
+            invoice_date=inv_date,
+            line_items=line_items,
+            delivery_date=delivery,
+            project_ref=project_ref,
+            due_date=payment_due,
+            cost_note=cost_note,
+            vat_note=vat_note,
+        )
+        pdf_content = render_invoice_pdf(invoice_data, config=config)
+        output_content = embed_xml_in_pdf(pdf_content, xml_content)
+
+        output_path = Path(output)
+        output_path.write_bytes(output_content)
+        console.print(f"[green]ZUGFeRD PDF saved to {output_path}[/green]")
+    except typer.Exit:
+        raise
+    except Exception as e:
+        handle_error(e)
+
+
+def _parse_customer_zugferd_items(items_json: str) -> list[dict[str, Decimal | str]]:
+    try:
+        raw_items = json.loads(items_json)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"--items must be valid JSON: {exc.msg}") from exc
+
+    if not isinstance(raw_items, list) or not raw_items:
+        raise ValueError("--items must be a non-empty JSON list")
+
+    line_items: list[dict[str, Decimal | str]] = []
+    for index, raw in enumerate(raw_items, start=1):
+        if not isinstance(raw, dict):
+            raise ValueError(f"Line item {index} must be an object")
+
+        description = raw.get("description") or raw.get("desc")
+        if not description:
+            raise ValueError(f"Line item {index} is missing required field: description")
+
+        quantity = Decimal(str(raw.get("quantity", raw.get("qty", "1"))))
+        if quantity <= 0:
+            raise ValueError(f"Line item {index} quantity must be greater than zero")
+
+        if "unit_price" in raw:
+            unit_price = Decimal(str(raw["unit_price"]))
+        elif "net" in raw:
+            unit_price = Decimal(str(raw["net"])) / quantity
+        else:
+            raise ValueError(f"Line item {index} is missing required field: unit_price")
+
+        line_items.append(
+            {
+                "description": str(description),
+                "quantity": quantity,
+                "unit_price": unit_price,
+                "tax_rate": Decimal(str(raw.get("tax_rate", raw.get("tax", "19.00")))),
+                "unit": str(raw.get("unit", "C62")),
+            }
+        )
+
+    return line_items
+
+
 # =============================================================================
 # Web Automation Commands
 # =============================================================================
