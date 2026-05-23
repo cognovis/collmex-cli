@@ -103,6 +103,7 @@ def _reserve_invoice_number(invoice_number: str) -> None:
     timestamp = datetime.now(tz=UTC).replace(tzinfo=None).isoformat() + "Z"
     record = {"invoice_number": invoice_number, "timestamp": timestamp}
     with open(reservation_file, "a", encoding="utf-8") as file:
+        os.chmod(reservation_file, 0o600)
         file.write(json.dumps(record, sort_keys=True) + "\n")
         file.flush()
         os.fsync(file.fileno())
