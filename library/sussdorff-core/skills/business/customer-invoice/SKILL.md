@@ -22,7 +22,7 @@ Use this skill for:
 
 - Creating Cognovis customer invoices from Timing.app entries.
 - Creating Ausgangsrechnungen with Collmex and ZUGFeRD output.
-- Preparing invoice drafts for a customer and Steuerberater Koch.
+- Preparing invoice drafts for a customer and the cognovis bookkeeping inbox (`buchhaltung@cognovis.de`).
 
 Do not use this skill for Google vendor invoices. Use `google-invoice` for that
 workflow and do not modify its files.
@@ -194,7 +194,7 @@ bash library/sussdorff-core/skills/business/customer-invoice/scripts/create_mail
 The script creates:
 
 - Customer draft to the interactively provided customer email with the PDF.
-- Steuerberater Koch draft to `buchhaltung@cognovis.de` with PDF and XML.
+- Bookkeeping draft to `buchhaltung@cognovis.de` with PDF and XML. `buchhaltung@cognovis.de` is the role address of the cognovis bookkeeper (currently Herr Koch) AND Collmex's Beleg-Posteingang (IMAP pickup) — one mail reaches both. The PDF lands in Collmex's Belegarchiv and is manually assigned to the CMXUMS booking via "Beleg → Zuordnung" in the Collmex UI. See bead collmex-cli-c12.5 for the planned Buchungsnummer-in-subject enhancement that makes the assignment direct.
 
 ### 9. Report Summary
 
