@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [2026.05.12] - 2026-05-23
+
 ### Added
 
 - **Race-safe invoice number reservation for `customer-invoice` skill**: `invoice_number.py` now appends each chosen number to a local JSONL reservation file (`~/Documents/cognovis/Buchhaltung/rechnungsnummern-reservierungen.jsonl`) before returning, preventing duplicate numbers when multiple invoice runs overlap.
