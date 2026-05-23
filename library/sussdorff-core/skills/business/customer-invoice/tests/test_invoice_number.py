@@ -121,3 +121,19 @@ def test_parallel_invocations_no_duplicate(tmp_path: Path) -> None:
         "I2026_05_0001",
         "I2026_05_0002",
     ]
+
+
+def test_creates_buchhaltung_dir_and_user_only_file(tmp_path: Path) -> None:
+    reservation_file = (
+        tmp_path / "Documents" / "cognovis" / "Buchhaltung" / "rechnungsnummern-reservierungen.jsonl"
+    )
+    run_result = Mock(returncode=0, stdout="[]", stderr="")
+
+    with (
+        patch("invoice_number.subprocess.run", return_value=run_result),
+        patch("os.fsync"),
+    ):
+        assert next_invoice_number(2026, 5, tmp_path) == "I2026_05_0001"
+
+    assert reservation_file.parent.is_dir()
+    assert reservation_file.stat().st_mode & 0o777 == 0o600
