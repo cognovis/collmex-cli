@@ -22,6 +22,7 @@ from collmex_cli.main import app
 from collmex_cli.models import Customer
 from collmex_cli.zugferd import (
     _customer_contact_name,
+    create_customer_invoice_data,
     create_customer_zugferd_xml,
     embed_xml_in_pdf,
     validate_customer_for_zugferd,
@@ -103,13 +104,13 @@ def _invoice_data() -> InvoiceData:
         delivery_date="21.05.2026",
         project_ref=None,
         line_items=[
-            InvoiceLineItem("Beratung", "10.00 HUR", "185.00", "1850.00"),
-            InvoiceLineItem("Reisekosten", "1.00 C62", "150.00", "150.00"),
+            InvoiceLineItem("Beratung", "10,00 Std.", "185,00", "1.850,00"),
+            InvoiceLineItem("Reisekosten", "1 Stk.", "150,00", "150,00"),
         ],
-        subtotal="2000.00",
-        vat_rate="19.00",
-        vat_amount="380.00",
-        total="2380.00",
+        subtotal="2.000,00",
+        vat_rate="19,00",
+        vat_amount="380,00",
+        total="2.380,00",
     )
 
 
@@ -195,6 +196,10 @@ def test_seller_buyer_roles(tmp_path):
     assert output_path.exists()
     sidecar_xml_path = output_path.with_suffix(".xml")
     assert sidecar_xml_path.exists()
+    visible_text = "\n".join(page.extract_text() for page in PdfReader(str(output_path)).pages)
+    assert "Zahlbar bis 04.06.2026" in visible_text
+    assert "1,00 Std." in visible_text
+    assert "HUR" not in visible_text
     xml = _xml_text(_embedded_facturx_xml(output_path.read_bytes()))
     assert sidecar_xml_path.read_bytes() == _embedded_facturx_xml(output_path.read_bytes())
     assert "<ram:SellerTradeParty>" in xml
@@ -300,6 +305,26 @@ def test_multiline_invoice_totals():
     assert "<ram:TaxBasisTotalAmount>2000.00</ram:TaxBasisTotalAmount>" in xml
     assert '<ram:TaxTotalAmount currencyID="EUR">380.00</ram:TaxTotalAmount>' in xml
     assert "<ram:GrandTotalAmount>2380.00</ram:GrandTotalAmount>" in xml
+
+
+def test_visible_invoice_data_uses_german_formatting_and_units():
+    """Visible invoice data formats money and units for readers, not EN16931 codes."""
+    invoice_data = create_customer_invoice_data(
+        customer=_customer(),
+        invoice_number="I2026_05_0001",
+        invoice_date=date(2026, 5, 21),
+        line_items=_line_items(),
+        delivery_date=date(2026, 5, 21),
+    )
+
+    assert invoice_data.line_items[0].quantity == "10,00 Std."
+    assert invoice_data.line_items[0].unit_price == "185,00"
+    assert invoice_data.line_items[0].amount == "1.850,00"
+    assert invoice_data.line_items[1].quantity == "1 Stk."
+    assert invoice_data.subtotal == "2.000,00"
+    assert invoice_data.vat_rate == "19,00"
+    assert invoice_data.total == "2.380,00"
+    assert invoice_data.due_date == "04.06.2026"
 
 
 def test_missing_master_data_errors():

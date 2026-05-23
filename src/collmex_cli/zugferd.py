@@ -163,6 +163,7 @@ def create_customer_invoice_data(
     """Build renderer input from customer and invoice line items."""
     _raise_for_missing_customer_fields(customer)
     totals = _calculate_totals(line_items)
+    visible_due_date = due_date or invoice_date + timedelta(days=14)
     return InvoiceData(
         company_name=_customer_name(customer),
         company_contact_name=_customer_contact_name(customer),
@@ -178,7 +179,7 @@ def create_customer_invoice_data(
         line_items=[
             InvoiceLineItem(
                 name=str(item["description"]),
-                quantity=f"{_money_decimal(item['quantity'])} {item.get('unit', 'C62')}",
+                quantity=_format_display_quantity(_money_decimal(item["quantity"]), str(item.get("unit", "C62"))),
                 unit_price=_format_amount(_money_decimal(item["unit_price"])),
                 amount=_format_amount(_money_decimal(item["quantity"]) * _money_decimal(item["unit_price"])),
             )
@@ -190,7 +191,7 @@ def create_customer_invoice_data(
         total=_format_amount(totals["gross"]),
         cost_note=cost_note,
         vat_note=vat_note,
-        due_date=_format_display_date(due_date) if due_date else None,
+        due_date=_format_display_date(visible_due_date),
     )
 
 
@@ -376,7 +377,31 @@ def _money_decimal(value: object) -> Decimal:
 
 
 def _format_amount(value: Decimal) -> str:
-    return f"{value.quantize(Decimal('0.01'))}"
+    formatted = f"{value.quantize(Decimal('0.01')):,.2f}"
+    return formatted.replace(",", "_").replace(".", ",").replace("_", ".")
+
+
+def _format_display_quantity(quantity: Decimal, unit: str) -> str:
+    visible_unit = _display_unit(unit)
+    minimum_decimals = 2 if unit == "HUR" else 0
+    formatted_quantity = _format_decimal(quantity, minimum_decimals=minimum_decimals)
+    if not visible_unit:
+        return formatted_quantity
+    return f"{formatted_quantity} {visible_unit}"
+
+
+def _format_decimal(value: Decimal, *, minimum_decimals: int) -> str:
+    quantized = value.quantize(Decimal("0.01"))
+    if minimum_decimals == 0 and quantized == quantized.to_integral_value():
+        return str(quantized.to_integral_value())
+    return _format_amount(quantized)
+
+
+def _display_unit(unit: str) -> str:
+    return {
+        "C62": "Stk.",
+        "HUR": "Std.",
+    }.get(unit, unit)
 
 
 def _format_display_date(value: date) -> str:

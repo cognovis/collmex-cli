@@ -1,7 +1,5 @@
 """Tests for the cognovis invoice PDF renderer."""
 
-from pathlib import Path
-
 import pytest
 
 from collmex_cli.config import CollmexConfig
@@ -84,15 +82,11 @@ def test_layout_contains_template_sections():
         b"solutio GmbH",
         b"Rechnung",
         b"I2026_04_0001",
-        b"Datum",
-        b"Rechnungs-Nr.",
         b"Lieferdatum",
         b"Beauftragung",
-        b"Bezeichnung",
         b"Menge",
         b"Preis",
         b"Summe",
-        b"Zwischensumme",
         b"Gesamtbetrag",
     ]:
         assert expected in pdf_bytes
@@ -108,7 +102,8 @@ def test_footer_pflichtangaben():
         b"DE118620281",
         b"HRB 28909",
         b"Amtsgericht Hamburg",
-        b"Malte Sussdorff",
+        b"Malte",
+        b"Sussdorff",
         b"DE93200704040062444500",
         b"DEUTDEHHXXX",
     ]:
@@ -144,6 +139,16 @@ def test_multiline_totals():
         b"16.736,91",
     ]:
         assert expected in pdf_bytes
+
+
+def test_layout_uses_tabular_footer_and_invoice_title():
+    """Invoice layout follows the compact tabular cognovis template."""
+    pdf_bytes = render_invoice_pdf(_invoice_data(), config=_seller_config())
+
+    assert b"Rechnung I2026_04_0001" in pdf_bytes
+    assert b"Bankverbindung: Fyrst" in pdf_bytes
+    assert b"Zahlbar bis 20.06.2026" in pdf_bytes
+    assert b"Rechnungs-Nr." not in pdf_bytes
 
 
 def test_validate_seller_config_reports_missing_fields():
