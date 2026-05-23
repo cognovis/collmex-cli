@@ -6,8 +6,6 @@ import re
 
 
 INVOICE_NUMBER_RE = re.compile(r"^I(?P<year>\d{4})_(?P<month>\d{2})_(?P<seq>\d{4})(?:\.(?:pdf|xml))?$")
-
-
 def invoice_number_from_parts(year: int, month: int, seq: int) -> str:
     """Format an invoice number as I2026_05_0001."""
     return f"I{year:04d}_{month:02d}_{seq:04d}"
@@ -65,6 +63,34 @@ def _collmex_highest_sequence(year: int, month: int) -> int:
     return highest_seq
 
 
+def _reservation_highest_sequence(year: int, month: int) -> int:
+    """Return the highest invoice sequence found in the local reservation file."""
+    reservation_file = (
+        Path.home() / "Documents" / "cognovis" / "Buchhaltung" / "rechnungsnummern-reservierungen.jsonl"
+    )
+    if not reservation_file.exists():
+        return 0
+
+    highest_seq = 0
+    for line in reservation_file.read_text(encoding="utf-8").splitlines():
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(record, dict):
+            continue
+        invoice_number = record.get("invoice_number")
+        if not isinstance(invoice_number, str):
+            continue
+        match = INVOICE_NUMBER_RE.match(invoice_number)
+        if match is None:
+            continue
+        if int(match.group("year")) != year or int(match.group("month")) != month:
+            continue
+        highest_seq = max(highest_seq, int(match.group("seq")))
+    return highest_seq
+
+
 def next_invoice_number(year: int, month: int, kunden_root: Path) -> str:
     """Return the next invoice number for the given year and month.
 
@@ -73,6 +99,7 @@ def next_invoice_number(year: int, month: int, kunden_root: Path) -> str:
     """
     highest_seq = 0
     highest_seq = max(highest_seq, _collmex_highest_sequence(year, month))
+    highest_seq = max(highest_seq, _reservation_highest_sequence(year, month))
     if kunden_root.exists():
         for path in kunden_root.rglob("*"):
             if not path.is_file():
