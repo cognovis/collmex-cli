@@ -4,7 +4,7 @@
   "acceptance_criteria": [
     {
       "id": "AC1",
-      "status": "implemented",
+      "status": "done",
       "summary": "Reservation JSONL is read as a third source and participates in the monthly max sequence calculation.",
       "changed_files": [
         "library/sussdorff-core/skills/business/customer-invoice/invoice_number.py",
@@ -18,7 +18,7 @@
     },
     {
       "id": "AC2",
-      "status": "implemented",
+      "status": "done",
       "summary": "The chosen invoice number is appended as JSONL with a UTC timestamp, flushed, and fsynced before return.",
       "changed_files": [
         "library/sussdorff-core/skills/business/customer-invoice/invoice_number.py",
@@ -32,7 +32,7 @@
     },
     {
       "id": "AC3",
-      "status": "implemented",
+      "status": "done",
       "summary": "A second invocation reads the first invocation's reservation and returns the next sequence.",
       "changed_files": [
         "library/sussdorff-core/skills/business/customer-invoice/tests/test_invoice_number.py"
@@ -44,7 +44,7 @@
     },
     {
       "id": "AC4",
-      "status": "implemented",
+      "status": "done",
       "summary": "The reservation directory is created with parents and the reservation file is chmodded to 0600.",
       "changed_files": [
         "library/sussdorff-core/skills/business/customer-invoice/invoice_number.py",
@@ -58,7 +58,7 @@
     },
     {
       "id": "AC5",
-      "status": "implemented",
+      "status": "done",
       "summary": "Reservation write/fsync failures propagate as OSError so no proposed number is returned to the caller.",
       "changed_files": [
         "library/sussdorff-core/skills/business/customer-invoice/tests/test_invoice_number.py"
@@ -107,20 +107,62 @@
     "next_invoice_number now creates and appends to ~/Documents/cognovis/Buchhaltung/rechnungsnummern-reservierungen.jsonl before returning.",
     "Callers must be prepared for OSError from local reservation persistence and must not proceed with booking if it occurs."
   ],
-  "evidence_refs": {
-    "test:test_reservation_file_in_max": "tests/test_invoice_number.py::test_reservation_file_in_max",
-    "test:test_atomic_append_with_fsync": "tests/test_invoice_number.py::test_atomic_append_with_fsync",
-    "test:test_parallel_invocations_no_duplicate": "tests/test_invoice_number.py::test_parallel_invocations_no_duplicate",
-    "test:test_creates_buchhaltung_dir_and_user_only_file": "tests/test_invoice_number.py::test_creates_buchhaltung_dir_and_user_only_file",
-    "test:test_write_failure_raises": "tests/test_invoice_number.py::test_write_failure_raises",
-    "cmd:red-ac1": "evidence_ledger.json commands[0]",
-    "cmd:green-ac1": "evidence_ledger.json commands[1]",
-    "cmd:red-ac2": "evidence_ledger.json commands[2]",
-    "cmd:green-ac2": "evidence_ledger.json commands[3]",
-    "cmd:ac3-regression": "evidence_ledger.json commands[4]",
-    "cmd:red-ac4": "evidence_ledger.json commands[5]",
-    "cmd:green-ac4": "evidence_ledger.json commands[6]",
-    "cmd:ac5-regression": "evidence_ledger.json commands[7]",
-    "cmd:final-suite": "evidence_ledger.json commands[8]"
-  }
+  "evidence_refs": [
+    {
+      "ref": "test:test_reservation_file_in_max",
+      "label": "confirmed"
+    },
+    {
+      "ref": "test:test_atomic_append_with_fsync",
+      "label": "confirmed"
+    },
+    {
+      "ref": "test:test_parallel_invocations_no_duplicate",
+      "label": "confirmed"
+    },
+    {
+      "ref": "test:test_creates_buchhaltung_dir_and_user_only_file",
+      "label": "confirmed"
+    },
+    {
+      "ref": "test:test_write_failure_raises",
+      "label": "confirmed"
+    },
+    {
+      "ref": "cmd:red-ac1",
+      "label": "confirmed"
+    },
+    {
+      "ref": "cmd:green-ac1",
+      "label": "confirmed"
+    },
+    {
+      "ref": "cmd:red-ac2",
+      "label": "confirmed"
+    },
+    {
+      "ref": "cmd:green-ac2",
+      "label": "confirmed"
+    },
+    {
+      "ref": "cmd:ac3-regression",
+      "label": "confirmed"
+    },
+    {
+      "ref": "cmd:red-ac4",
+      "label": "confirmed"
+    },
+    {
+      "ref": "cmd:green-ac4",
+      "label": "confirmed"
+    },
+    {
+      "ref": "cmd:ac5-regression",
+      "label": "confirmed"
+    },
+    {
+      "ref": "cmd:final-suite",
+      "label": "confirmed"
+    }
+  ]
 }
