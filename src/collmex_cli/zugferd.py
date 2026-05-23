@@ -165,7 +165,7 @@ def create_customer_invoice_data(
     totals = _calculate_totals(line_items)
     return InvoiceData(
         company_name=_customer_name(customer),
-        company_contact_name=None,
+        company_contact_name=_customer_contact_name(customer),
         address_line1=customer.street,
         postal_code=customer.zip_code,
         city=customer.city,
@@ -275,6 +275,20 @@ def _raise_for_missing_customer_fields(customer: Customer) -> None:
 
 def _customer_name(customer: Customer) -> str:
     return customer.company_name or f"{customer.first_name} {customer.last_name}".strip()
+
+
+def _customer_contact_name(customer: Customer) -> str | None:
+    """Return the recipient contact line (z.Hd.) when a company has a named contact.
+
+    Only rendered when the address is a company; for private customers the
+    person name is already the main recipient line.
+    """
+    if not customer.company_name:
+        return None
+    person = " ".join(p for p in (customer.title, customer.first_name, customer.last_name) if p).strip()
+    if not person:
+        return None
+    return f"z.Hd. {person}"
 
 
 def _add_line_items(doc: Document, line_items: list[dict]) -> tuple[Decimal, dict[str, tuple[Decimal, Decimal]]]:

@@ -21,15 +21,28 @@ class CollmexAuthError(CollmexError):
     """Authentication failed."""
 
 
-def extract_new_object_id(rows: list[list[str]]) -> int:
-    """Extract the Collmex booking number from a NEW_OBJECT_ID response row."""
+def find_new_object_id(rows: list[list[str]]) -> int | None:
+    """Return the Collmex object id from a NEW_OBJECT_ID row, or None if absent.
+
+    Some imports (e.g. CMXUMS customer invoices) confirm success with only a
+    MESSAGE row and never return a NEW_OBJECT_ID. Callers that can legitimately
+    succeed without an id should use this instead of extract_new_object_id.
+    """
     for row in rows:
         if row and row[0] == "NEW_OBJECT_ID":
             try:
                 return int(row[1])
             except (IndexError, ValueError) as exc:
                 raise CollmexError("Invalid NEW_OBJECT_ID response from Collmex") from exc
-    raise CollmexError("Collmex response did not include NEW_OBJECT_ID for created booking")
+    return None
+
+
+def extract_new_object_id(rows: list[list[str]]) -> int:
+    """Extract the Collmex booking number from a NEW_OBJECT_ID response row."""
+    object_id = find_new_object_id(rows)
+    if object_id is None:
+        raise CollmexError("Collmex response did not include NEW_OBJECT_ID for created booking")
+    return object_id
 
 
 class CollmexAPI:

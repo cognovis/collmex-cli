@@ -2,7 +2,7 @@
 
 from datetime import date
 
-from .api import CollmexAPI, extract_new_object_id
+from .api import CollmexAPI, extract_new_object_id, find_new_object_id
 from .config import CollmexConfig
 from .models import (
     AccountBalance,
@@ -305,10 +305,15 @@ class CollmexClient:
     # Customer Invoices
     # =========================================================================
 
-    def create_customer_invoice(self, invoice: CustomerInvoice) -> int:
-        """Create a customer invoice (books revenue in accounting)."""
+    def create_customer_invoice(self, invoice: CustomerInvoice) -> int | None:
+        """Create a customer invoice (books revenue in accounting).
+
+        A successful CMXUMS import confirms with a MESSAGE row only and does not
+        return a booking number, so this returns None on success without an id.
+        Errors are still raised by the underlying request via _check_errors.
+        """
         rows = self.api.request(invoice.to_csv_row())
-        return extract_new_object_id(rows)
+        return find_new_object_id(rows)
 
     # =========================================================================
     # Open Items (Offene Posten)

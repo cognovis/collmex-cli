@@ -322,6 +322,8 @@ def list_customers(
 def create_customer(
     customer_id: Annotated[int | None, typer.Option("--id", help="Customer ID (for updating existing customer)")] = None,
     company_name: Annotated[str | None, typer.Option("--company-name", "-c", help="Company name")] = None,
+    salutation: Annotated[str | None, typer.Option("--salutation", help="Salutation (Anrede)")] = None,
+    title: Annotated[str | None, typer.Option("--title", help="Title (e.g. Dr.)")] = None,
     first_name: Annotated[str | None, typer.Option("--first-name", help="First name")] = None,
     last_name: Annotated[str | None, typer.Option("--last-name", help="Last name")] = None,
     street: Annotated[str | None, typer.Option("--street", help="Street address")] = None,
@@ -337,6 +339,8 @@ def create_customer(
         customer = Customer(
             customer_id=customer_id,
             company_name=company_name or "",
+            salutation=salutation or "",
+            title=title or "",
             first_name=first_name or "",
             last_name=last_name or "",
             street=street or "",
@@ -790,7 +794,8 @@ def create_customer_invoice(
             console.print("[green]Customer invoice created successfully[/green]")
             console.print(f"Customer: {customer_id}")
             console.print(f"Invoice: {invoice_number}")
-            console.print(f"Buchungsnummer: {buchungsnummer}")
+            if buchungsnummer is not None:
+                console.print(f"Buchungsnummer: {buchungsnummer}")
             console.print(f"Amount: {net} EUR (net)")
             console.print(f"Tax: {tax} EUR")
     except Exception as e:

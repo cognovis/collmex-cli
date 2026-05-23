@@ -8,7 +8,7 @@ from unittest.mock import patch
 import pytest
 from typer.testing import CliRunner
 
-from collmex_cli.api import CollmexError, extract_new_object_id
+from collmex_cli.api import CollmexError, extract_new_object_id, find_new_object_id
 from collmex_cli.client import CollmexClient
 from collmex_cli.main import app
 from collmex_cli.models import AccountingDocument, CustomerInvoice, OpenItem
@@ -37,6 +37,14 @@ class TestExtractNewObjectId:
         """An empty response (no NEW_OBJECT_ID row) raises CollmexError."""
         with pytest.raises(CollmexError, match="did not include NEW_OBJECT_ID"):
             extract_new_object_id([])
+
+    def test_find_returns_id_when_present(self):
+        """find_new_object_id returns the booking number when the row is present."""
+        assert find_new_object_id([["NEW_OBJECT_ID", "12345"]]) == 12345
+
+    def test_find_returns_none_when_absent(self):
+        """find_new_object_id returns None instead of raising when no id row exists."""
+        assert find_new_object_id([["MESSAGE", "S", "204020", "OK"]]) is None
 
     @patch("collmex_cli.client.CollmexAPI")
     def test_create_customer_invoice_uses_parser(self, mock_api_cls):
@@ -172,10 +180,16 @@ class TestCustomerInvoiceCommand:
         assert data["buchungsnummer"] == 12345
 
     @patch("collmex_cli.client.CollmexAPI")
-    def test_missing_new_object_id_errors(self, mock_api_cls):
-        """customer invoice creation requires a NEW_OBJECT_ID response row."""
+    def test_success_message_without_new_object_id_returns_none(self, mock_api_cls):
+        """A CMXUMS success confirms with MESSAGE only and yields None, not an error.
+
+        Regression for collmex-cli-30p: the booking succeeds but Collmex returns
+        no NEW_OBJECT_ID, so create_customer_invoice must not raise.
+        """
         mock_api = mock_api_cls.return_value
-        mock_api.request.return_value = [["MESSAGE", "S", "0", "OK"]]
+        mock_api.request.return_value = [
+            ["MESSAGE", "S", "204020", "Datenübertragung erfolgreich. Es wurden 1 Datensätze verarbeitet."]
+        ]
 
         client = CollmexClient.__new__(CollmexClient)
         client.api = mock_api
@@ -187,8 +201,7 @@ class TestCustomerInvoiceCommand:
             tax_full=Decimal("19.00"),
         )
 
-        with pytest.raises(CollmexError, match="NEW_OBJECT_ID"):
-            client.create_customer_invoice(invoice)
+        assert client.create_customer_invoice(invoice) is None
 
     @patch("collmex_cli.main.CollmexClient", autospec=True)
     def test_duplicate_number_rejected(self, mock_client_cls):

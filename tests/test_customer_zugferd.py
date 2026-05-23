@@ -21,6 +21,7 @@ from collmex_cli.invoice_renderer import InvoiceData, InvoiceLineItem, render_in
 from collmex_cli.main import app
 from collmex_cli.models import Customer
 from collmex_cli.zugferd import (
+    _customer_contact_name,
     create_customer_zugferd_xml,
     embed_xml_in_pdf,
     validate_customer_for_zugferd,
@@ -323,3 +324,36 @@ def test_missing_master_data_errors():
             line_items=_line_items(),
             config=_seller_config(),
         )
+
+
+class TestCustomerContactName:
+    """collmex-cli-9hb: render a 'z.Hd.' contact line for company customers."""
+
+    def test_company_with_title_and_person(self):
+        """Title, first and last name combine into a z.Hd. line."""
+        customer = _customer(
+            company_name="Healthcare Futurists GmbH",
+            title="Dr.",
+            first_name="Tobias",
+            last_name="Gantner",
+        )
+        assert _customer_contact_name(customer) == "z.Hd. Dr. Tobias Gantner"
+
+    def test_company_with_person_no_title(self):
+        """A person without a title still gets a z.Hd. line."""
+        customer = _customer(
+            company_name="Acme GmbH", first_name="Erika", last_name="Mustermann"
+        )
+        assert _customer_contact_name(customer) == "z.Hd. Erika Mustermann"
+
+    def test_company_without_person_is_none(self):
+        """A company with no contact person has no z.Hd. line."""
+        customer = _customer(company_name="Acme GmbH", first_name="", last_name="")
+        assert _customer_contact_name(customer) is None
+
+    def test_private_customer_is_none(self):
+        """Private customers (no company) carry the name as the main line, not z.Hd."""
+        customer = _customer(
+            company_name="", first_name="Erika", last_name="Mustermann"
+        )
+        assert _customer_contact_name(customer) is None
