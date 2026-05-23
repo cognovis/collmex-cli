@@ -4,7 +4,7 @@
   "acceptance_criteria": [
     {
       "id": "AC1",
-      "status": "passed",
+      "status": "done",
       "summary": "customer-invoice JSON output includes top-level buchungsnummer from Collmex NEW_OBJECT_ID",
       "changed_files": [
         "src/collmex_cli/api.py",
@@ -12,11 +12,14 @@
         "src/collmex_cli/main.py",
         "tests/test_customer_invoice.py"
       ],
-      "evidence_refs": ["cmd-green-ac1", "cmd-full-cli"]
+      "evidence_refs": [
+        "cmd-green-ac1",
+        "cmd-full-cli"
+      ]
     },
     {
       "id": "AC2",
-      "status": "passed",
+      "status": "done",
       "summary": "vendor-invoice JSON output includes top-level buchungsnummer from Collmex NEW_OBJECT_ID",
       "changed_files": [
         "src/collmex_cli/api.py",
@@ -24,39 +27,51 @@
         "src/collmex_cli/main.py",
         "tests/test_vendor_features.py"
       ],
-      "evidence_refs": ["cmd-green-ac2", "cmd-full-cli"]
+      "evidence_refs": [
+        "cmd-green-ac2",
+        "cmd-full-cli"
+      ]
     },
     {
       "id": "AC3",
-      "status": "passed",
+      "status": "done",
       "summary": "invoice creation raises CollmexError instead of silently emitting null or zero when NEW_OBJECT_ID is missing",
       "changed_files": [
         "src/collmex_cli/api.py",
         "src/collmex_cli/client.py",
         "tests/test_customer_invoice.py"
       ],
-      "evidence_refs": ["cmd-green-ac3", "cmd-full-cli"]
+      "evidence_refs": [
+        "cmd-green-ac3",
+        "cmd-full-cli"
+      ]
     },
     {
       "id": "AC4",
-      "status": "passed",
+      "status": "done",
       "summary": "customer-invoice skill captures buchungsnummer and create_mail_drafts.sh passes BUCHUNGSNUMMER to osascript",
       "changed_files": [
         "library/sussdorff-core/skills/business/customer-invoice/SKILL.md",
         "library/sussdorff-core/skills/business/customer-invoice/scripts/create_mail_drafts.sh",
         "library/sussdorff-core/skills/business/customer-invoice/tests/test_create_mail_drafts.py"
       ],
-      "evidence_refs": ["cmd-green-ac4", "cmd-full-skill"]
+      "evidence_refs": [
+        "cmd-green-ac4",
+        "cmd-full-skill"
+      ]
     },
     {
       "id": "AC5",
-      "status": "passed",
+      "status": "done",
       "summary": "bookkeeping Mail draft subject and body include both invoice number and Buchungsnummer when provided",
       "changed_files": [
         "library/sussdorff-core/skills/business/customer-invoice/scripts/create_mail_drafts.sh",
         "library/sussdorff-core/skills/business/customer-invoice/tests/test_create_mail_drafts.py"
       ],
-      "evidence_refs": ["cmd-green-ac5", "cmd-full-skill"]
+      "evidence_refs": [
+        "cmd-green-ac5",
+        "cmd-full-skill"
+      ]
     }
   ],
   "changed_files": [
