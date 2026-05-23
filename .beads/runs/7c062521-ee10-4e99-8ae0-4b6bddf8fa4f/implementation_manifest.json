@@ -33,13 +33,15 @@
     {
       "id": "AC3",
       "status": "done",
-      "summary": "A second invocation reads the first invocation's reservation and returns the next sequence.",
+      "summary": "A second invocation reads the first invocation's reservation and returns the next sequence. Concurrent invocations are serialized by an exclusive fcntl.flock held across the reservation read-modify-write, so no two callers can pick the same number (TOCTOU race fixed).",
       "changed_files": [
+        "library/sussdorff-core/skills/business/customer-invoice/invoice_number.py",
         "library/sussdorff-core/skills/business/customer-invoice/tests/test_invoice_number.py"
       ],
       "evidence_refs": [
         "cmd:ac3-regression",
-        "test:test_parallel_invocations_no_duplicate"
+        "test:test_parallel_invocations_no_duplicate",
+        "test:test_concurrent_threads_no_duplicate"
       ]
     },
     {
@@ -83,13 +85,14 @@
     "74ac17c test(collmex-cli-c12.6): cover parallel reservation sequencing",
     "139d902 test(collmex-cli-c12.6): red \u2014 reservation file is user only",
     "ed94a20 feat(collmex-cli-c12.6): green \u2014 enforce reservation file mode",
-    "0bd995f test(collmex-cli-c12.6): cover reservation write failures"
+    "0bd995f test(collmex-cli-c12.6): cover reservation write failures",
+    "fix(collmex-cli-c12.6): add fcntl.flock to prevent TOCTOU race in reservation read-modify-write"
   ],
   "tests": [
     {
       "command": "uv run pytest tests/ -v",
       "working_directory": "library/sussdorff-core/skills/business/customer-invoice",
-      "result": "18 passed"
+      "result": "19 passed"
     }
   ],
   "external_resources": [
@@ -105,7 +108,8 @@
   "scope_changes": [],
   "downstream_impacts": [
     "next_invoice_number now creates and appends to ~/Documents/cognovis/Buchhaltung/rechnungsnummern-reservierungen.jsonl before returning.",
-    "Callers must be prepared for OSError from local reservation persistence and must not proceed with booking if it occurs."
+    "Callers must be prepared for OSError from local reservation persistence and must not proceed with booking if it occurs.",
+    "The reservation read-modify-write is now serialized by fcntl.flock(LOCK_EX). fcntl is POSIX-only; the module is no longer importable on non-POSIX platforms (acceptable for the single-machine macOS target)."
   ],
   "evidence_refs": [
     {
@@ -118,6 +122,10 @@
     },
     {
       "ref": "test:test_parallel_invocations_no_duplicate",
+      "label": "confirmed"
+    },
+    {
+      "ref": "test:test_concurrent_threads_no_duplicate",
       "label": "confirmed"
     },
     {

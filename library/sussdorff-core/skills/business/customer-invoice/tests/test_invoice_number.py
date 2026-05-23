@@ -1,4 +1,5 @@
 import json
+import threading
 from collections.abc import Iterator
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -126,6 +127,55 @@ def test_parallel_invocations_no_duplicate(tmp_path: Path) -> None:
         "I2026_05_0001",
         "I2026_05_0002",
     ]
+
+
+def test_concurrent_threads_no_duplicate(tmp_path: Path) -> None:
+    """The exclusive flock must serialize the read-modify-write across threads.
+
+    Twenty threads start simultaneously and each reserve a number. Without the
+    lock, several would observe the same reservation maximum and emit duplicate
+    numbers. With it, every returned number and every persisted record is unique
+    and the sequence is contiguous.
+    """
+    reservation_file = (
+        tmp_path / "Documents" / "cognovis" / "Buchhaltung" / "rechnungsnummern-reservierungen.jsonl"
+    )
+    run_result = Mock(returncode=0, stdout="[]", stderr="")
+
+    thread_count = 20
+    start_barrier = threading.Barrier(thread_count)
+    results: list[str] = []
+    results_lock = threading.Lock()
+
+    def worker() -> None:
+        start_barrier.wait()
+        number = next_invoice_number(2026, 5, tmp_path)
+        with results_lock:
+            results.append(number)
+
+    with (
+        patch("invoice_number.subprocess.run", return_value=run_result),
+        patch("os.fsync"),
+    ):
+        threads = [threading.Thread(target=worker) for _ in range(thread_count)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+    assert len(results) == thread_count
+    assert len(set(results)) == thread_count, f"duplicate numbers returned: {sorted(results)}"
+
+    persisted = [
+        json.loads(line)["invoice_number"]
+        for line in reservation_file.read_text(encoding="utf-8").splitlines()
+    ]
+    assert len(persisted) == thread_count
+    assert len(set(persisted)) == thread_count, f"duplicate reservations persisted: {sorted(persisted)}"
+
+    expected = {invoice_number_from_parts(2026, 5, seq) for seq in range(1, thread_count + 1)}
+    assert set(results) == expected
+    assert set(persisted) == expected
 
 
 def test_creates_buchhaltung_dir_and_user_only_file(tmp_path: Path) -> None:

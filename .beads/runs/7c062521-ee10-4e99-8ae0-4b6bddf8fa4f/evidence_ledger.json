@@ -73,6 +73,22 @@
       "purpose": "Final verification after formatting cleanup.",
       "exit_code": 0,
       "observed_result": "Full suite passed with 18 tests."
+    },
+    {
+      "id": "toctou-fix-teeth",
+      "command": "python - (neutralize fcntl.flock, run 20 concurrent threads x5 trials)",
+      "working_directory": "library/sussdorff-core/skills/business/customer-invoice",
+      "purpose": "Prove test_concurrent_threads_no_duplicate detects the race: with the lock disabled the read-modify-write must produce duplicate numbers.",
+      "exit_code": 0,
+      "observed_result": "With flock neutralized, 8-12 duplicate numbers appeared per trial across 20 threads, confirming the new test has teeth."
+    },
+    {
+      "id": "toctou-fix-suite",
+      "command": "uv run pytest tests/ -v",
+      "working_directory": "library/sussdorff-core/skills/business/customer-invoice",
+      "purpose": "Verify the fcntl.flock fix: full suite green with the new concurrency test, zero duplicates.",
+      "exit_code": 0,
+      "observed_result": "Full suite passed with 19 tests including test_concurrent_threads_no_duplicate."
     }
   ],
   "skipped_checks": [
