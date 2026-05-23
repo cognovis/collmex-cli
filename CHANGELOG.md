@@ -1,5 +1,16 @@
 ## [Unreleased]
 
+## [2026.05.13] - 2026-05-23
+
+### Fixed
+
+- **`customer-invoice` no longer errors on a successful booking**: A successful CMXUMS import confirms with a `MESSAGE` row only and never returns a `NEW_OBJECT_ID`, so `create_customer_invoice` previously raised `Collmex response did not include NEW_OBJECT_ID for created booking` on success — risking duplicate bookings on retry. New `find_new_object_id()` returns `None` instead of raising; `create_customer_invoice` now returns `int | None` and the CLI omits the `Buchungsnummer` line when Collmex returns none. (collmex-cli-30p)
+- **`customer-zugferd-create` renders the contact person**: The recipient `z.Hd.` line was hardcoded to `None` and never appeared. It is now built from the customer's title/first/last name when the address is a company (e.g. `z.Hd. Dr. Tobias Gantner`). (collmex-cli-9hb)
+
+### Added
+
+- **`customer-create --salutation` / `--title`**: Store a salutation (Anrede) and title (e.g. `Dr.`) on the customer record so it can be rendered on outgoing invoices.
+
 ## [2026.05.12] - 2026-05-23
 
 ### Added
