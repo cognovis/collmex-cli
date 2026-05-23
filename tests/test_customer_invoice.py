@@ -8,12 +8,53 @@ from unittest.mock import patch
 import pytest
 from typer.testing import CliRunner
 
-from collmex_cli.api import CollmexError
+from collmex_cli.api import CollmexError, extract_new_object_id
 from collmex_cli.client import CollmexClient
 from collmex_cli.main import app
 from collmex_cli.models import AccountingDocument, CustomerInvoice, OpenItem
 
 runner = CliRunner()
+
+
+class TestExtractNewObjectId:
+    """AC1/AC3: extract_new_object_id parses the Collmex NEW_OBJECT_ID record.
+
+    The Collmex CSV convention is row[0] = record type, row[1] = first data
+    field. The NEW_OBJECT_ID record format is ``NEW_OBJECT_ID;<id>``, so the
+    booking number lives at row[1].
+    """
+
+    def test_returns_booking_number(self):
+        """A real-shaped NEW_OBJECT_ID row yields the integer booking number."""
+        assert extract_new_object_id([["NEW_OBJECT_ID", "12345"]]) == 12345
+
+    def test_non_numeric_id_raises(self):
+        """A non-numeric booking number raises CollmexError."""
+        with pytest.raises(CollmexError, match="Invalid NEW_OBJECT_ID"):
+            extract_new_object_id([["NEW_OBJECT_ID", "not-a-number"]])
+
+    def test_missing_new_object_id_raises(self):
+        """An empty response (no NEW_OBJECT_ID row) raises CollmexError."""
+        with pytest.raises(CollmexError, match="did not include NEW_OBJECT_ID"):
+            extract_new_object_id([])
+
+    @patch("collmex_cli.client.CollmexAPI")
+    def test_create_customer_invoice_uses_parser(self, mock_api_cls):
+        """create_customer_invoice runs the real parser over the API response."""
+        mock_api = mock_api_cls.return_value
+        mock_api.request.return_value = [["NEW_OBJECT_ID", "99999"]]
+
+        client = CollmexClient.__new__(CollmexClient)
+        client.api = mock_api
+        invoice = CustomerInvoice(
+            customer_id=123,
+            invoice_number="I2026_05_0001",
+            invoice_date=date(2026, 5, 21),
+            net_amount_full_tax=Decimal("100.00"),
+            tax_full=Decimal("19.00"),
+        )
+
+        assert client.create_customer_invoice(invoice) == 99999
 
 
 class TestVatCalculation:

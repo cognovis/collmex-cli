@@ -85,6 +85,20 @@
       "exit_code": 0,
       "result": "9 passed",
       "purpose": "Full regression: all customer-invoice skill tests pass with no regressions"
+    },
+    {
+      "id": "cmd-pairfix-parser",
+      "command": "uv run pytest tests/test_customer_invoice.py::TestExtractNewObjectId -v",
+      "exit_code": 0,
+      "result": "4 passed",
+      "purpose": "Pair-loop iter 1: direct unit tests for extract_new_object_id (row[1] booking number, non-numeric raises, empty raises, real parser pipeline via mocked api.request)"
+    },
+    {
+      "id": "cmd-pairfix-full",
+      "command": "uv run pytest tests/ --tb=short",
+      "exit_code": 0,
+      "result": "205 passed",
+      "purpose": "Pair-loop iter 1: full regression after row[2]->row[1] fix and new parser tests"
     }
   ],
   "skipped_checks": [],

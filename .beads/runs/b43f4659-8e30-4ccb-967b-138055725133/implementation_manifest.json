@@ -14,7 +14,9 @@
       ],
       "evidence_refs": [
         "cmd-green-ac1",
-        "cmd-full-cli"
+        "cmd-full-cli",
+        "cmd-pairfix-parser",
+        "cmd-pairfix-full"
       ]
     },
     {
@@ -43,7 +45,9 @@
       ],
       "evidence_refs": [
         "cmd-green-ac3",
-        "cmd-full-cli"
+        "cmd-full-cli",
+        "cmd-pairfix-parser",
+        "cmd-pairfix-full"
       ]
     },
     {
@@ -104,7 +108,8 @@
     "uv run pytest library/sussdorff-core/skills/business/customer-invoice/tests/test_create_mail_drafts.py::test_passes_buchungsnummer_env -v",
     "uv run pytest library/sussdorff-core/skills/business/customer-invoice/tests/test_create_mail_drafts.py::test_subject_includes_both_numbers -v",
     "uv run pytest tests/ -v --tb=short",
-    "uv run pytest library/sussdorff-core/skills/business/customer-invoice/tests/ -v --tb=short"
+    "uv run pytest library/sussdorff-core/skills/business/customer-invoice/tests/ -v --tb=short",
+    "uv run pytest tests/test_customer_invoice.py::TestExtractNewObjectId -v"
   ],
   "external_resources": [],
   "scope_changes": [],
@@ -124,6 +129,8 @@
     "cmd-green-ac4",
     "cmd-green-ac5",
     "cmd-full-cli",
-    "cmd-full-skill"
+    "cmd-full-skill",
+    "cmd-pairfix-parser",
+    "cmd-pairfix-full"
   ]
 }
