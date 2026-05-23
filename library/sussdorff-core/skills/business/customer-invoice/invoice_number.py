@@ -3,11 +3,13 @@ from datetime import UTC, datetime
 import json
 import os
 from pathlib import Path
-import subprocess
 import re
+import subprocess
 
 
 INVOICE_NUMBER_RE = re.compile(r"^I(?P<year>\d{4})_(?P<month>\d{2})_(?P<seq>\d{4})(?:\.(?:pdf|xml))?$")
+
+
 def invoice_number_from_parts(year: int, month: int, seq: int) -> str:
     """Format an invoice number as I2026_05_0001."""
     return f"I{year:04d}_{month:02d}_{seq:04d}"

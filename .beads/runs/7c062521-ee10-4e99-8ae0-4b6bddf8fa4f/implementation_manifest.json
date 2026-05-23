@@ -1,0 +1,126 @@
+{
+  "contract_version": "1",
+  "bead_id": "collmex-cli-c12.6",
+  "acceptance_criteria": [
+    {
+      "id": "AC1",
+      "status": "implemented",
+      "summary": "Reservation JSONL is read as a third source and participates in the monthly max sequence calculation.",
+      "changed_files": [
+        "library/sussdorff-core/skills/business/customer-invoice/invoice_number.py",
+        "library/sussdorff-core/skills/business/customer-invoice/tests/test_invoice_number.py"
+      ],
+      "evidence_refs": [
+        "cmd:red-ac1",
+        "cmd:green-ac1",
+        "test:test_reservation_file_in_max"
+      ]
+    },
+    {
+      "id": "AC2",
+      "status": "implemented",
+      "summary": "The chosen invoice number is appended as JSONL with a UTC timestamp, flushed, and fsynced before return.",
+      "changed_files": [
+        "library/sussdorff-core/skills/business/customer-invoice/invoice_number.py",
+        "library/sussdorff-core/skills/business/customer-invoice/tests/test_invoice_number.py"
+      ],
+      "evidence_refs": [
+        "cmd:red-ac2",
+        "cmd:green-ac2",
+        "test:test_atomic_append_with_fsync"
+      ]
+    },
+    {
+      "id": "AC3",
+      "status": "implemented",
+      "summary": "A second invocation reads the first invocation's reservation and returns the next sequence.",
+      "changed_files": [
+        "library/sussdorff-core/skills/business/customer-invoice/tests/test_invoice_number.py"
+      ],
+      "evidence_refs": [
+        "cmd:ac3-regression",
+        "test:test_parallel_invocations_no_duplicate"
+      ]
+    },
+    {
+      "id": "AC4",
+      "status": "implemented",
+      "summary": "The reservation directory is created with parents and the reservation file is chmodded to 0600.",
+      "changed_files": [
+        "library/sussdorff-core/skills/business/customer-invoice/invoice_number.py",
+        "library/sussdorff-core/skills/business/customer-invoice/tests/test_invoice_number.py"
+      ],
+      "evidence_refs": [
+        "cmd:red-ac4",
+        "cmd:green-ac4",
+        "test:test_creates_buchhaltung_dir_and_user_only_file"
+      ]
+    },
+    {
+      "id": "AC5",
+      "status": "implemented",
+      "summary": "Reservation write/fsync failures propagate as OSError so no proposed number is returned to the caller.",
+      "changed_files": [
+        "library/sussdorff-core/skills/business/customer-invoice/tests/test_invoice_number.py"
+      ],
+      "evidence_refs": [
+        "cmd:ac5-regression",
+        "test:test_write_failure_raises"
+      ]
+    }
+  ],
+  "changed_files": [
+    ".beads/runs/7c062521-ee10-4e99-8ae0-4b6bddf8fa4f/evidence_ledger.json",
+    ".beads/runs/7c062521-ee10-4e99-8ae0-4b6bddf8fa4f/implementation_manifest.json",
+    "library/sussdorff-core/skills/business/customer-invoice/invoice_number.py",
+    "library/sussdorff-core/skills/business/customer-invoice/tests/test_invoice_number.py"
+  ],
+  "commits": [
+    "06683fe test(collmex-cli-c12.6): red \u2014 reservation file participates in max",
+    "8977a2f feat(collmex-cli-c12.6): green \u2014 read reservation file in max",
+    "1ed677f test(collmex-cli-c12.6): red \u2014 append reservation with fsync",
+    "5deb666 feat(collmex-cli-c12.6): green \u2014 reserve number before return",
+    "74ac17c test(collmex-cli-c12.6): cover parallel reservation sequencing",
+    "139d902 test(collmex-cli-c12.6): red \u2014 reservation file is user only",
+    "ed94a20 feat(collmex-cli-c12.6): green \u2014 enforce reservation file mode",
+    "0bd995f test(collmex-cli-c12.6): cover reservation write failures"
+  ],
+  "tests": [
+    {
+      "command": "uv run pytest tests/ -v",
+      "working_directory": "library/sussdorff-core/skills/business/customer-invoice",
+      "result": "18 passed"
+    }
+  ],
+  "external_resources": [
+    "/Users/malte/.agents/standards/python-default-bash-exception.md",
+    "/Users/malte/.agents/standards/python-cli-patterns/python-cli-patterns.md",
+    "/Users/malte/.agents/standards/python/security-defaults.md",
+    "/Users/malte/.agents/standards/python/python314-patterns.md",
+    "/Users/malte/.agents/standards/python/dependency-injection.md",
+    "/Users/malte/.agents/standards/python/cli-patterns.md",
+    "/Users/malte/.agents/standards/python/style.md",
+    "/Users/malte/.agents/standards/python/third-party-sdk-compat.md"
+  ],
+  "scope_changes": [],
+  "downstream_impacts": [
+    "next_invoice_number now creates and appends to ~/Documents/cognovis/Buchhaltung/rechnungsnummern-reservierungen.jsonl before returning.",
+    "Callers must be prepared for OSError from local reservation persistence and must not proceed with booking if it occurs."
+  ],
+  "evidence_refs": {
+    "test:test_reservation_file_in_max": "tests/test_invoice_number.py::test_reservation_file_in_max",
+    "test:test_atomic_append_with_fsync": "tests/test_invoice_number.py::test_atomic_append_with_fsync",
+    "test:test_parallel_invocations_no_duplicate": "tests/test_invoice_number.py::test_parallel_invocations_no_duplicate",
+    "test:test_creates_buchhaltung_dir_and_user_only_file": "tests/test_invoice_number.py::test_creates_buchhaltung_dir_and_user_only_file",
+    "test:test_write_failure_raises": "tests/test_invoice_number.py::test_write_failure_raises",
+    "cmd:red-ac1": "evidence_ledger.json commands[0]",
+    "cmd:green-ac1": "evidence_ledger.json commands[1]",
+    "cmd:red-ac2": "evidence_ledger.json commands[2]",
+    "cmd:green-ac2": "evidence_ledger.json commands[3]",
+    "cmd:ac3-regression": "evidence_ledger.json commands[4]",
+    "cmd:red-ac4": "evidence_ledger.json commands[5]",
+    "cmd:green-ac4": "evidence_ledger.json commands[6]",
+    "cmd:ac5-regression": "evidence_ledger.json commands[7]",
+    "cmd:final-suite": "evidence_ledger.json commands[8]"
+  }
+}

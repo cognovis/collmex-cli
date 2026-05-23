@@ -1,0 +1,98 @@
+{
+  "contract_version": "1",
+  "bead_id": "collmex-cli-c12.6",
+  "commands": [
+    {
+      "id": "red-ac1",
+      "command": "uv run pytest tests/test_invoice_number.py::test_reservation_file_in_max -v",
+      "working_directory": "library/sussdorff-core/skills/business/customer-invoice",
+      "purpose": "RED gate for AC1 reservation file max source.",
+      "exit_code": 1,
+      "observed_result": "Failed for the intended reason: returned I2026_05_0006 instead of I2026_05_0008 because the reservation file was ignored."
+    },
+    {
+      "id": "green-ac1",
+      "command": "uv run pytest tests/test_invoice_number.py::test_reservation_file_in_max -v && uv run pytest tests/ -v",
+      "working_directory": "library/sussdorff-core/skills/business/customer-invoice",
+      "purpose": "GREEN gate for AC1 plus full suite regression check.",
+      "exit_code": 0,
+      "observed_result": "Targeted AC1 test passed; full suite passed with 14 tests."
+    },
+    {
+      "id": "red-ac2",
+      "command": "uv run pytest tests/test_invoice_number.py::test_atomic_append_with_fsync -v",
+      "working_directory": "library/sussdorff-core/skills/business/customer-invoice",
+      "purpose": "RED gate for AC2 append and fsync behavior.",
+      "exit_code": 1,
+      "observed_result": "Failed for the intended reason: reservation JSONL file did not exist after next_invoice_number returned."
+    },
+    {
+      "id": "green-ac2",
+      "command": "uv run pytest tests/test_invoice_number.py::test_atomic_append_with_fsync -v && uv run pytest tests/ -v",
+      "working_directory": "library/sussdorff-core/skills/business/customer-invoice",
+      "purpose": "GREEN gate for AC2 plus full suite regression check.",
+      "exit_code": 0,
+      "observed_result": "Targeted AC2 test passed; full suite passed with 15 tests."
+    },
+    {
+      "id": "ac3-regression",
+      "command": "uv run pytest tests/test_invoice_number.py::test_parallel_invocations_no_duplicate -v",
+      "working_directory": "library/sussdorff-core/skills/business/customer-invoice",
+      "purpose": "Dedicated AC3 regression test for two invocations before external booking completion.",
+      "exit_code": 0,
+      "observed_result": "Passed: first call returned I2026_05_0001, second call returned I2026_05_0002, and both reservations were present."
+    },
+    {
+      "id": "red-ac4",
+      "command": "uv run pytest tests/test_invoice_number.py::test_creates_buchhaltung_dir_and_user_only_file -v",
+      "working_directory": "library/sussdorff-core/skills/business/customer-invoice",
+      "purpose": "RED gate for AC4 user-only reservation file mode.",
+      "exit_code": 1,
+      "observed_result": "Failed for the intended reason: reservation file mode was 0644 instead of 0600."
+    },
+    {
+      "id": "green-ac4",
+      "command": "uv run pytest tests/test_invoice_number.py::test_creates_buchhaltung_dir_and_user_only_file -v && uv run pytest tests/ -v",
+      "working_directory": "library/sussdorff-core/skills/business/customer-invoice",
+      "purpose": "GREEN gate for AC4 plus full suite regression check.",
+      "exit_code": 0,
+      "observed_result": "Targeted AC4 test passed; full suite passed with 17 tests."
+    },
+    {
+      "id": "ac5-regression",
+      "command": "uv run pytest tests/test_invoice_number.py::test_write_failure_raises -v && uv run pytest tests/ -v",
+      "working_directory": "library/sussdorff-core/skills/business/customer-invoice",
+      "purpose": "Dedicated AC5 regression test for fsync OSError propagation plus full suite check.",
+      "exit_code": 0,
+      "observed_result": "Targeted AC5 test passed; full suite passed with 18 tests."
+    },
+    {
+      "id": "final-suite",
+      "command": "uv run pytest tests/ -v",
+      "working_directory": "library/sussdorff-core/skills/business/customer-invoice",
+      "purpose": "Final verification after formatting cleanup.",
+      "exit_code": 0,
+      "observed_result": "Full suite passed with 18 tests."
+    }
+  ],
+  "skipped_checks": [
+    {
+      "check": "Independent failing RED gate for AC3 after AC2 green implementation.",
+      "reason": "AC2's required append-before-return implementation already satisfied AC3. The dedicated AC3 test was added and passed as a regression test instead of forcing an artificial failure."
+    },
+    {
+      "check": "Independent failing RED gate for AC5 after AC2 green implementation.",
+      "reason": "The AC2 implementation intentionally does not catch write or fsync OSError, so AC5 behavior already existed. The dedicated AC5 test was added and passed as a regression test."
+    }
+  ],
+  "artifacts": [
+    {
+      "path": ".beads/runs/7c062521-ee10-4e99-8ae0-4b6bddf8fa4f/implementation_manifest.json",
+      "kind": "implementation_manifest"
+    },
+    {
+      "path": ".beads/runs/7c062521-ee10-4e99-8ae0-4b6bddf8fa4f/evidence_ledger.json",
+      "kind": "evidence_ledger"
+    }
+  ]
+}

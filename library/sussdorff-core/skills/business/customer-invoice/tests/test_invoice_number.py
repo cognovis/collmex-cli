@@ -1,6 +1,7 @@
 import json
-from unittest.mock import Mock, patch
+from collections.abc import Iterator
 from pathlib import Path
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -8,7 +9,7 @@ from invoice_number import invoice_number_from_parts, next_invoice_number
 
 
 @pytest.fixture(autouse=True)
-def isolated_home(tmp_path: Path) -> None:
+def isolated_home(tmp_path: Path) -> Iterator[None]:
     with patch("invoice_number.Path.home", return_value=tmp_path):
         yield
 
@@ -90,7 +91,9 @@ def test_atomic_append_with_fsync(tmp_path: Path) -> None:
     ):
         assert next_invoice_number(2026, 5, tmp_path) == "I2026_05_0001"
 
-    records = [json.loads(line) for line in reservation_file.read_text(encoding="utf-8").splitlines()]
+    records = [
+        json.loads(line) for line in reservation_file.read_text(encoding="utf-8").splitlines()
+    ]
     assert records == [
         {
             "invoice_number": "I2026_05_0001",
@@ -114,7 +117,9 @@ def test_parallel_invocations_no_duplicate(tmp_path: Path) -> None:
         first_number = next_invoice_number(2026, 5, tmp_path)
         second_number = next_invoice_number(2026, 5, tmp_path)
 
-    records = [json.loads(line) for line in reservation_file.read_text(encoding="utf-8").splitlines()]
+    records = [
+        json.loads(line) for line in reservation_file.read_text(encoding="utf-8").splitlines()
+    ]
     assert first_number == "I2026_05_0001"
     assert second_number == "I2026_05_0002"
     assert [record["invoice_number"] for record in records] == [
