@@ -99,3 +99,25 @@ def test_atomic_append_with_fsync(tmp_path: Path) -> None:
     ]
     assert records[0]["timestamp"].endswith("Z")
     fsync.assert_called_once()
+
+
+def test_parallel_invocations_no_duplicate(tmp_path: Path) -> None:
+    reservation_file = (
+        tmp_path / "Documents" / "cognovis" / "Buchhaltung" / "rechnungsnummern-reservierungen.jsonl"
+    )
+    run_result = Mock(returncode=0, stdout="[]", stderr="")
+
+    with (
+        patch("invoice_number.subprocess.run", return_value=run_result),
+        patch("os.fsync"),
+    ):
+        first_number = next_invoice_number(2026, 5, tmp_path)
+        second_number = next_invoice_number(2026, 5, tmp_path)
+
+    records = [json.loads(line) for line in reservation_file.read_text(encoding="utf-8").splitlines()]
+    assert first_number == "I2026_05_0001"
+    assert second_number == "I2026_05_0002"
+    assert [record["invoice_number"] for record in records] == [
+        "I2026_05_0001",
+        "I2026_05_0002",
+    ]
