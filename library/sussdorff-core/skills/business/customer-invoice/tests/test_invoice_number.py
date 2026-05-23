@@ -76,3 +76,26 @@ def test_reservation_file_in_max(tmp_path: Path) -> None:
 
     with patch("invoice_number.subprocess.run", return_value=run_result):
         assert next_invoice_number(2026, 5, tmp_path) == "I2026_05_0008"
+
+
+def test_atomic_append_with_fsync(tmp_path: Path) -> None:
+    reservation_file = (
+        tmp_path / "Documents" / "cognovis" / "Buchhaltung" / "rechnungsnummern-reservierungen.jsonl"
+    )
+    run_result = Mock(returncode=0, stdout="[]", stderr="")
+
+    with (
+        patch("invoice_number.subprocess.run", return_value=run_result),
+        patch("os.fsync") as fsync,
+    ):
+        assert next_invoice_number(2026, 5, tmp_path) == "I2026_05_0001"
+
+    records = [json.loads(line) for line in reservation_file.read_text(encoding="utf-8").splitlines()]
+    assert records == [
+        {
+            "invoice_number": "I2026_05_0001",
+            "timestamp": records[0]["timestamp"],
+        }
+    ]
+    assert records[0]["timestamp"].endswith("Z")
+    fsync.assert_called_once()
