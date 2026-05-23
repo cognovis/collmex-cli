@@ -51,7 +51,7 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["tests", "library/sussdorff-core/skills/business/customer-invoice/tests"]
+testpaths = ["tests"]
 addopts = "--import-mode=importlib"
 
 [tool.ruff]

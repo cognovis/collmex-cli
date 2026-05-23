@@ -1071,7 +1071,10 @@ def create_customer_zugferd(
 
         output_path = Path(output)
         output_path.write_bytes(output_content)
+        xml_output_path = output_path.with_suffix(".xml")
+        xml_output_path.write_bytes(xml_content)
         console.print(f"[green]ZUGFeRD PDF saved to {output_path}[/green]")
+        console.print(f"[green]ZUGFeRD XML saved to {xml_output_path}[/green]")
     except typer.Exit:
         raise
     except Exception as e:

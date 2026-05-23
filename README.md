@@ -167,9 +167,10 @@ collmex customer-zugferd-create \
 ```
 
 The output file is a PDF/A-3 with the ZUGFeRD XML (`factur-x.xml`) attached as
-`AFRelationship=Alternative`. It passes EN16931 schematron validation automatically;
-missing seller or buyer master-data fields produce a clear error listing the affected
-fields before any file is written.
+`AFRelationship=Alternative`; the same XML is also written as a sidecar file next
+to the PDF, using the same base name and `.xml` extension. It passes EN16931
+schematron validation automatically; missing seller or buyer master-data fields
+produce a clear error listing the affected fields before any file is written.
 
 Seller master data must be present in `CollmexConfig` (env vars starting with
 `COLLMEX_SELLER_`). See the *Seller master data* section under Configuration above.

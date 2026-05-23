@@ -192,7 +192,10 @@ def test_seller_buyer_roles(tmp_path):
 
     assert result.exit_code == 0, result.output
     assert output_path.exists()
+    sidecar_xml_path = output_path.with_suffix(".xml")
+    assert sidecar_xml_path.exists()
     xml = _xml_text(_embedded_facturx_xml(output_path.read_bytes()))
+    assert sidecar_xml_path.read_bytes() == _embedded_facturx_xml(output_path.read_bytes())
     assert "<ram:SellerTradeParty>" in xml
     assert "cognovis GmbH" in xml
     assert "DE118620281" in xml
