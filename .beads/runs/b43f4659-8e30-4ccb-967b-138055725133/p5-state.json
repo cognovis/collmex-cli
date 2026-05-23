@@ -1,0 +1,24 @@
+{
+  "run_id": "b43f4659-8e30-4ccb-967b-138055725133",
+  "bead_id": "collmex-cli-c12.5",
+  "adapter": "codex-impl",
+  "phase": "p5",
+  "checkpoint": "started",
+  "iteration": 1,
+  "models": {
+    "impl": null,
+    "reviewer": null
+  },
+  "verdicts": [],
+  "pre_impl_sha": "d19aea6a419813fb715ca27bf6c1d1cb2a8dc29b",
+  "post_impl_sha": "2f0eb9266a4b45a96665a88e0c3e2b1a2d47ace6",
+  "completion_report": {
+    "status": "implemented",
+    "tests": {
+      "cli": "201 passed",
+      "customer_invoice_skill": "9 passed"
+    }
+  },
+  "created_at": "2026-05-23T06:45:27.569421+00:00",
+  "updated_at": "2026-05-23T07:10:00+00:00"
+}

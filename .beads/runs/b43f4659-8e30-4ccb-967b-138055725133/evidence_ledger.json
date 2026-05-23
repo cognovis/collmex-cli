@@ -1,0 +1,84 @@
+{
+  "contract_version": "1",
+  "bead_id": "collmex-cli-c12.5",
+  "commands": [
+    {
+      "id": "cmd-red-ac1",
+      "command": "uv run pytest tests/test_customer_invoice.py::TestCustomerInvoiceCommand::test_buchungsnummer_in_json -v",
+      "exit_code": 1,
+      "result": "failed before implementation with KeyError: 'buchungsnummer'"
+    },
+    {
+      "id": "cmd-red-ac2",
+      "command": "uv run pytest tests/test_vendor_features.py::TestVendorInvoiceCommand::test_vendor_invoice_buchungsnummer_in_json -v",
+      "exit_code": 1,
+      "result": "failed before implementation with KeyError: 'buchungsnummer'"
+    },
+    {
+      "id": "cmd-red-ac3",
+      "command": "uv run pytest tests/test_customer_invoice.py::TestCustomerInvoiceCommand::test_missing_new_object_id_errors -v",
+      "exit_code": 1,
+      "result": "failed before implementation because CollmexError was not raised"
+    },
+    {
+      "id": "cmd-red-ac4",
+      "command": "uv run pytest library/sussdorff-core/skills/business/customer-invoice/tests/test_create_mail_drafts.py::test_passes_buchungsnummer_env -v",
+      "exit_code": 1,
+      "result": "failed before implementation because osascript argv ended at XML_PATH"
+    },
+    {
+      "id": "cmd-red-ac5",
+      "command": "uv run pytest library/sussdorff-core/skills/business/customer-invoice/tests/test_create_mail_drafts.py::test_subject_includes_both_numbers -v",
+      "exit_code": 1,
+      "result": "failed before implementation because AppleScript did not include Buchung in bookkeeping subject/body"
+    },
+    {
+      "id": "cmd-green-ac1",
+      "command": "uv run pytest tests/test_customer_invoice.py::TestCustomerInvoiceCommand::test_buchungsnummer_in_json -v",
+      "exit_code": 0,
+      "result": "1 passed"
+    },
+    {
+      "id": "cmd-green-ac2",
+      "command": "uv run pytest tests/test_vendor_features.py::TestVendorInvoiceCommand::test_vendor_invoice_buchungsnummer_in_json -v",
+      "exit_code": 0,
+      "result": "1 passed"
+    },
+    {
+      "id": "cmd-green-ac3",
+      "command": "uv run pytest tests/test_customer_invoice.py::TestCustomerInvoiceCommand::test_missing_new_object_id_errors -v",
+      "exit_code": 0,
+      "result": "1 passed"
+    },
+    {
+      "id": "cmd-green-ac4",
+      "command": "uv run pytest library/sussdorff-core/skills/business/customer-invoice/tests/test_create_mail_drafts.py::test_passes_buchungsnummer_env -v",
+      "exit_code": 0,
+      "result": "1 passed"
+    },
+    {
+      "id": "cmd-green-ac5",
+      "command": "uv run pytest library/sussdorff-core/skills/business/customer-invoice/tests/test_create_mail_drafts.py::test_subject_includes_both_numbers -v",
+      "exit_code": 0,
+      "result": "1 passed"
+    },
+    {
+      "id": "cmd-full-cli",
+      "command": "uv run pytest tests/ -v --tb=short",
+      "exit_code": 0,
+      "result": "201 passed"
+    },
+    {
+      "id": "cmd-full-skill",
+      "command": "uv run pytest library/sussdorff-core/skills/business/customer-invoice/tests/ -v --tb=short",
+      "exit_code": 0,
+      "result": "9 passed"
+    }
+  ],
+  "skipped_checks": [],
+  "artifacts": [
+    ".beads/runs/b43f4659-8e30-4ccb-967b-138055725133/p5-state.json",
+    ".beads/runs/b43f4659-8e30-4ccb-967b-138055725133/implementation_manifest.json",
+    ".beads/runs/b43f4659-8e30-4ccb-967b-138055725133/evidence_ledger.json"
+  ]
+}
