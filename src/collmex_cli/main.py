@@ -776,14 +776,21 @@ def create_customer_invoice(
         )
 
         with CollmexClient() as client:
-            result = client.create_customer_invoice(invoice)
+            buchungsnummer = client.create_customer_invoice(invoice)
 
         if json_output:
-            output_json({"status": "created", "invoice": invoice.model_dump(), "response": result})
+            output_json(
+                {
+                    "status": "created",
+                    "invoice": invoice.model_dump(),
+                    "buchungsnummer": buchungsnummer,
+                }
+            )
         else:
             console.print("[green]Customer invoice created successfully[/green]")
             console.print(f"Customer: {customer_id}")
             console.print(f"Invoice: {invoice_number}")
+            console.print(f"Buchungsnummer: {buchungsnummer}")
             console.print(f"Amount: {net} EUR (net)")
             console.print(f"Tax: {tax} EUR")
     except Exception as e:
@@ -826,14 +833,21 @@ def create_vendor_invoice(
         )
 
         with CollmexClient() as client:
-            result = client.create_vendor_invoice(invoice)
+            buchungsnummer = client.create_vendor_invoice(invoice)
 
         if json_output:
-            output_json({"status": "created", "invoice": invoice.model_dump(), "response": result})
+            output_json(
+                {
+                    "status": "created",
+                    "invoice": invoice.model_dump(),
+                    "buchungsnummer": buchungsnummer,
+                }
+            )
         else:
             console.print(f"[green]Vendor invoice created successfully[/green]")
             console.print(f"Vendor: {vendor_id}")
             console.print(f"Invoice: {invoice_number}")
+            console.print(f"Buchungsnummer: {buchungsnummer}")
             console.print(f"Amount: {net_amount} EUR (net)")
     except Exception as e:
         handle_error(e)

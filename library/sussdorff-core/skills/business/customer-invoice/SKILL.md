@@ -168,16 +168,18 @@ folder before booking the invoice.
 Compute the confirmed net total and run:
 
 ```bash
-cd ~/code/cli-tools/collmex-cli && uv run collmex customer-invoice \
+cd ~/code/cli-tools/collmex-cli
+booking_json="$(uv run collmex customer-invoice \
   --customer-id <collmex_customer_id> \
   --invoice "<invoice_number>" \
   --date "<invoice_date>" \
   --net <net_total> \
   --text "<invoice_description>" \
-  --json
+  --json)"
+buchungsnummer="$(python -c 'import json, sys; print(json.load(sys.stdin)["buchungsnummer"])' <<< "$booking_json")"
 ```
 
-Check the JSON response for success before creating Mail drafts.
+Check the JSON response for success and keep `buchungsnummer` for the Mail drafts.
 
 ### 8. Create Visible Mail Drafts
 
@@ -188,13 +190,14 @@ CUSTOMER_EMAIL="<customer@example.com>" \
 INVOICE_NUMBER="<invoice_number>" \
 PDF_PATH="/Users/malte/Documents/cognovis/Kunden/<Kunde>/Rechnungen/<invoice_number>.pdf" \
 XML_PATH="/Users/malte/Documents/cognovis/Kunden/<Kunde>/Rechnungen/<invoice_number>.xml" \
+BUCHUNGSNUMMER="$buchungsnummer" \
 bash library/sussdorff-core/skills/business/customer-invoice/scripts/create_mail_drafts.sh
 ```
 
 The script creates:
 
 - Customer draft to the interactively provided customer email with the PDF.
-- Bookkeeping draft to `buchhaltung@cognovis.de` with PDF and XML. `buchhaltung@cognovis.de` is the role address of the cognovis bookkeeper (currently Herr Koch) AND Collmex's Beleg-Posteingang (IMAP pickup) — one mail reaches both. The PDF lands in Collmex's Belegarchiv and is manually assigned to the CMXUMS booking via "Beleg → Zuordnung" in the Collmex UI. See bead collmex-cli-c12.5 for the planned Buchungsnummer-in-subject enhancement that makes the assignment direct.
+- Bookkeeping draft to `buchhaltung@cognovis.de` with PDF and XML. `buchhaltung@cognovis.de` is the role address of the cognovis bookkeeper (currently Herr Koch) AND Collmex's Beleg-Posteingang (IMAP pickup) — one mail reaches both. The PDF lands in Collmex's Belegarchiv and is manually assigned to the CMXUMS booking via "Beleg → Zuordnung" in the Collmex UI. The subject and body include the Buchungsnummer so the booking can be found directly.
 
 ### 9. Report Summary
 

@@ -1,0 +1,128 @@
+{
+  "status": "ok",
+  "summary": "implementation impact score built",
+  "data": {
+    "bead_id": "collmex-cli-c12.5",
+    "contract_version": "1",
+    "artifact_validation": "pass",
+    "artifact_validation_errors": [],
+    "manifest_load_errors": [],
+    "evidence_load_errors": [],
+    "p5_state_errors": [],
+    "acceptance_criteria": {
+      "done": 5,
+      "total": 5,
+      "ratio": 1.0,
+      "status_counts": {
+        "done": 5
+      },
+      "done_with_evidence_refs": 5,
+      "all_done_have_evidence_refs": true
+    },
+    "ledger_commands": 14,
+    "skipped_checks": {
+      "with_reason": 0,
+      "total": 0,
+      "ratio": 1.0
+    },
+    "phase5": {
+      "checkpoint": "completed",
+      "review_iterations": 1,
+      "state_iteration": 1,
+      "verdict_count": 0
+    },
+    "phase7_result": "clean",
+    "phase9_result": "verified",
+    "phase9_missing_evidence_disputes": 0,
+    "manual_context_recovery_needed": "no",
+    "score_components": [
+      {
+        "name": "artifact_validation",
+        "weight": 15,
+        "value": 1.0,
+        "points": 15.0,
+        "reason": "implementation_manifest.json and evidence_ledger.json passed schema validation"
+      },
+      {
+        "name": "acceptance_criteria_completion",
+        "weight": 15,
+        "value": 1.0,
+        "points": 15.0,
+        "reason": "share of manifest acceptance criteria marked done"
+      },
+      {
+        "name": "done_acceptance_criteria_have_evidence",
+        "weight": 15,
+        "value": 1.0,
+        "points": 15.0,
+        "reason": "every done acceptance criterion has evidence_refs"
+      },
+      {
+        "name": "command_evidence_recorded",
+        "weight": 10,
+        "value": 1.0,
+        "points": 10.0,
+        "reason": "evidence ledger records at least one command"
+      },
+      {
+        "name": "skipped_checks_explained",
+        "weight": 10,
+        "value": 1.0,
+        "points": 10.0,
+        "reason": "skipped or unverifiable checks include reasons"
+      },
+      {
+        "name": "phase5_review_recorded",
+        "weight": 10,
+        "value": 1.0,
+        "points": 10.0,
+        "reason": "p5-state records review iteration data"
+      },
+      {
+        "name": "phase7_adversarial_completed",
+        "weight": 5,
+        "value": 1.0,
+        "points": 5.0,
+        "reason": "Phase 7 produced clean or findings instead of skipped or unknown"
+      },
+      {
+        "name": "phase9_verification_strength",
+        "weight": 10,
+        "value": 1.0,
+        "points": 10.0,
+        "reason": "Phase 9 verification result"
+      },
+      {
+        "name": "no_missing_evidence_disputes",
+        "weight": 5,
+        "value": 1.0,
+        "points": 5.0,
+        "reason": "verification did not dispute missing implementation evidence"
+      },
+      {
+        "name": "no_manual_context_recovery",
+        "weight": 5,
+        "value": 1.0,
+        "points": 5.0,
+        "reason": "review or verification did not require manual context recovery"
+      }
+    ],
+    "evidence_flow_score": 100.0,
+    "bead_metadata": {
+      "contract_version": "1",
+      "score": 100.0,
+      "artifact_validation": "pass",
+      "ac_done": 5,
+      "ac_total": 5,
+      "ledger_commands": 14,
+      "phase5_review_iterations": 1,
+      "phase7_result": "clean",
+      "phase9_result": "verified",
+      "phase9_missing_evidence_disputes": 0,
+      "manual_context_recovery_needed": "no",
+      "artifact_path": ".beads/runs/b43f4659-8e30-4ccb-967b-138055725133/impact-score.json"
+    }
+  },
+  "errors": [],
+  "next_steps": []
+}

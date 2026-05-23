@@ -2,7 +2,7 @@
 
 from datetime import date
 
-from .api import CollmexAPI
+from .api import CollmexAPI, extract_new_object_id
 from .config import CollmexConfig
 from .models import (
     AccountBalance,
@@ -289,24 +289,26 @@ class CollmexClient:
     # Vendor Invoices (Lieferantenrechnungen)
     # =========================================================================
 
-    def create_vendor_invoice(self, invoice: VendorInvoice) -> list[str]:
+    def create_vendor_invoice(self, invoice: VendorInvoice) -> int:
         """Create a vendor invoice (books expense in accounting).
 
         Args:
             invoice: VendorInvoice object
 
         Returns:
-            Raw API response rows
+            Collmex booking number
         """
-        return self.api.request(invoice.to_csv_row())
+        rows = self.api.request(invoice.to_csv_row())
+        return extract_new_object_id(rows)
 
     # =========================================================================
     # Customer Invoices
     # =========================================================================
 
-    def create_customer_invoice(self, invoice: CustomerInvoice) -> list[str]:
+    def create_customer_invoice(self, invoice: CustomerInvoice) -> int:
         """Create a customer invoice (books revenue in accounting)."""
-        return self.api.request(invoice.to_csv_row())
+        rows = self.api.request(invoice.to_csv_row())
+        return extract_new_object_id(rows)
 
     # =========================================================================
     # Open Items (Offene Posten)

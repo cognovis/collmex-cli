@@ -1,0 +1,136 @@
+{
+  "contract_version": "1",
+  "bead_id": "collmex-cli-c12.5",
+  "acceptance_criteria": [
+    {
+      "id": "AC1",
+      "status": "done",
+      "summary": "customer-invoice JSON output includes top-level buchungsnummer from Collmex NEW_OBJECT_ID",
+      "changed_files": [
+        "src/collmex_cli/api.py",
+        "src/collmex_cli/client.py",
+        "src/collmex_cli/main.py",
+        "tests/test_customer_invoice.py"
+      ],
+      "evidence_refs": [
+        "cmd-green-ac1",
+        "cmd-full-cli",
+        "cmd-pairfix-parser",
+        "cmd-pairfix-full"
+      ]
+    },
+    {
+      "id": "AC2",
+      "status": "done",
+      "summary": "vendor-invoice JSON output includes top-level buchungsnummer from Collmex NEW_OBJECT_ID",
+      "changed_files": [
+        "src/collmex_cli/api.py",
+        "src/collmex_cli/client.py",
+        "src/collmex_cli/main.py",
+        "tests/test_vendor_features.py"
+      ],
+      "evidence_refs": [
+        "cmd-green-ac2",
+        "cmd-full-cli"
+      ]
+    },
+    {
+      "id": "AC3",
+      "status": "done",
+      "summary": "invoice creation raises CollmexError instead of silently emitting null or zero when NEW_OBJECT_ID is missing",
+      "changed_files": [
+        "src/collmex_cli/api.py",
+        "src/collmex_cli/client.py",
+        "tests/test_customer_invoice.py"
+      ],
+      "evidence_refs": [
+        "cmd-green-ac3",
+        "cmd-full-cli",
+        "cmd-pairfix-parser",
+        "cmd-pairfix-full"
+      ]
+    },
+    {
+      "id": "AC4",
+      "status": "done",
+      "summary": "customer-invoice skill captures buchungsnummer and create_mail_drafts.sh passes BUCHUNGSNUMMER to osascript",
+      "changed_files": [
+        "library/sussdorff-core/skills/business/customer-invoice/SKILL.md",
+        "library/sussdorff-core/skills/business/customer-invoice/scripts/create_mail_drafts.sh",
+        "library/sussdorff-core/skills/business/customer-invoice/tests/test_create_mail_drafts.py"
+      ],
+      "evidence_refs": [
+        "cmd-green-ac4",
+        "cmd-full-skill"
+      ]
+    },
+    {
+      "id": "AC5",
+      "status": "done",
+      "summary": "bookkeeping Mail draft subject and body include both invoice number and Buchungsnummer when provided",
+      "changed_files": [
+        "library/sussdorff-core/skills/business/customer-invoice/scripts/create_mail_drafts.sh",
+        "library/sussdorff-core/skills/business/customer-invoice/tests/test_create_mail_drafts.py"
+      ],
+      "evidence_refs": [
+        "cmd-green-ac5",
+        "cmd-full-skill"
+      ]
+    }
+  ],
+  "changed_files": [
+    "src/collmex_cli/api.py",
+    "src/collmex_cli/client.py",
+    "src/collmex_cli/main.py",
+    "tests/test_customer_invoice.py",
+    "tests/test_vendor_features.py",
+    "library/sussdorff-core/skills/business/customer-invoice/SKILL.md",
+    "library/sussdorff-core/skills/business/customer-invoice/scripts/create_mail_drafts.sh",
+    "library/sussdorff-core/skills/business/customer-invoice/tests/test_create_mail_drafts.py",
+    ".beads/runs/b43f4659-8e30-4ccb-967b-138055725133/p5-state.json",
+    ".beads/runs/b43f4659-8e30-4ccb-967b-138055725133/implementation_manifest.json",
+    ".beads/runs/b43f4659-8e30-4ccb-967b-138055725133/evidence_ledger.json"
+  ],
+  "commits": [
+    {
+      "sha": "d4b115c",
+      "message": "test(collmex-cli-c12.5): red — booking numbers in invoice flows"
+    },
+    {
+      "sha": "2f0eb92",
+      "message": "feat(collmex-cli-c12.5): green — surface booking numbers"
+    }
+  ],
+  "tests": [
+    "uv run pytest tests/test_customer_invoice.py::TestCustomerInvoiceCommand::test_buchungsnummer_in_json -v",
+    "uv run pytest tests/test_vendor_features.py::TestVendorInvoiceCommand::test_vendor_invoice_buchungsnummer_in_json -v",
+    "uv run pytest tests/test_customer_invoice.py::TestCustomerInvoiceCommand::test_missing_new_object_id_errors -v",
+    "uv run pytest library/sussdorff-core/skills/business/customer-invoice/tests/test_create_mail_drafts.py::test_passes_buchungsnummer_env -v",
+    "uv run pytest library/sussdorff-core/skills/business/customer-invoice/tests/test_create_mail_drafts.py::test_subject_includes_both_numbers -v",
+    "uv run pytest tests/ -v --tb=short",
+    "uv run pytest library/sussdorff-core/skills/business/customer-invoice/tests/ -v --tb=short",
+    "uv run pytest tests/test_customer_invoice.py::TestExtractNewObjectId -v"
+  ],
+  "external_resources": [],
+  "scope_changes": [],
+  "downstream_impacts": [
+    "CollmexClient.create_customer_invoice and create_vendor_invoice now return int booking numbers instead of raw API response rows.",
+    "JSON output for invoice booking commands no longer includes the raw response field for these two commands; it includes buchungsnummer."
+  ],
+  "evidence_refs": [
+    "cmd-red-ac1",
+    "cmd-red-ac2",
+    "cmd-red-ac3",
+    "cmd-red-ac4",
+    "cmd-red-ac5",
+    "cmd-green-ac1",
+    "cmd-green-ac2",
+    "cmd-green-ac3",
+    "cmd-green-ac4",
+    "cmd-green-ac5",
+    "cmd-full-cli",
+    "cmd-full-skill",
+    "cmd-pairfix-parser",
+    "cmd-pairfix-full"
+  ]
+}

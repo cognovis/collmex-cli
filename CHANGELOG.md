@@ -2,6 +2,16 @@
 
 ### Added
 
+- **Buchungsnummer capture for `customer-invoice` and `vendor-invoice`**: Both commands now return the Collmex booking number (`buchungsnummer`) from the `NEW_OBJECT_ID` response field.
+  - `collmex customer-invoice --json` output includes `"buchungsnummer": <int>` alongside the existing `status` and `invoice` fields.
+  - `collmex vendor-invoice --json` returns the same `"buchungsnummer": <int>` field (symmetric).
+  - Missing `NEW_OBJECT_ID` in the Collmex response causes a non-zero exit with a clear error — no silent null or zero.
+  - Console output (non-JSON mode) prints `Buchungsnummer: <int>` after the invoice number.
+- **Buchungsnummer in bookkeeping mail**: The `customer-invoice` skill (step 8) now passes `BUCHUNGSNUMMER` to `create_mail_drafts.sh`.
+  - Subject of the bookkeeping draft: `Rechnung <Rechnungsnummer> — Buchung <Buchungsnummer>`.
+  - Body mentions the booking number and notes it can be used in Collmex under `Beleg → Zuordnung`.
+  - `BUCHUNGSNUMMER` is optional; when absent, the script falls back to the previous subject/body format.
+
 - **`customer-invoice` skill**: Interactive agent workflow for creating outgoing cognovis invoices end-to-end.
   - Collects billable positions from Timing.app (`query_timing_entries`) and travel costs from MoneyMoney or manual mileage entry.
   - Calls `collmex customer-zugferd-create` to generate a ZUGFeRD PDF/A-3 and sidecar XML, then books the invoice via `collmex customer-invoice`.

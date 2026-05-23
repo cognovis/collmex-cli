@@ -1,0 +1,110 @@
+{
+  "contract_version": "1",
+  "bead_id": "collmex-cli-c12.5",
+  "commands": [
+    {
+      "id": "cmd-red-ac1",
+      "command": "uv run pytest tests/test_customer_invoice.py::TestCustomerInvoiceCommand::test_buchungsnummer_in_json -v",
+      "exit_code": 1,
+      "result": "failed before implementation with KeyError: 'buchungsnummer'",
+      "purpose": "RED gate: verify test fails before implementation (AC1 buchungsnummer in customer-invoice JSON)"
+    },
+    {
+      "id": "cmd-red-ac2",
+      "command": "uv run pytest tests/test_vendor_features.py::TestVendorInvoiceCommand::test_vendor_invoice_buchungsnummer_in_json -v",
+      "exit_code": 1,
+      "result": "failed before implementation with KeyError: 'buchungsnummer'",
+      "purpose": "RED gate: verify test fails before implementation (AC2 buchungsnummer in vendor-invoice JSON)"
+    },
+    {
+      "id": "cmd-red-ac3",
+      "command": "uv run pytest tests/test_customer_invoice.py::TestCustomerInvoiceCommand::test_missing_new_object_id_errors -v",
+      "exit_code": 1,
+      "result": "failed before implementation because CollmexError was not raised",
+      "purpose": "RED gate: verify test fails before implementation (AC3 error on missing NEW_OBJECT_ID)"
+    },
+    {
+      "id": "cmd-red-ac4",
+      "command": "uv run pytest library/sussdorff-core/skills/business/customer-invoice/tests/test_create_mail_drafts.py::test_passes_buchungsnummer_env -v",
+      "exit_code": 1,
+      "result": "failed before implementation because osascript argv ended at XML_PATH",
+      "purpose": "RED gate: verify test fails before implementation (AC4 BUCHUNGSNUMMER env passed to osascript)"
+    },
+    {
+      "id": "cmd-red-ac5",
+      "command": "uv run pytest library/sussdorff-core/skills/business/customer-invoice/tests/test_create_mail_drafts.py::test_subject_includes_both_numbers -v",
+      "exit_code": 1,
+      "result": "failed before implementation because AppleScript did not include Buchung in bookkeeping subject/body",
+      "purpose": "RED gate: verify test fails before implementation (AC5 bookkeeping subject includes Buchungsnummer)"
+    },
+    {
+      "id": "cmd-green-ac1",
+      "command": "uv run pytest tests/test_customer_invoice.py::TestCustomerInvoiceCommand::test_buchungsnummer_in_json -v",
+      "exit_code": 0,
+      "result": "1 passed",
+      "purpose": "GREEN gate: verify AC1 test passes after implementation"
+    },
+    {
+      "id": "cmd-green-ac2",
+      "command": "uv run pytest tests/test_vendor_features.py::TestVendorInvoiceCommand::test_vendor_invoice_buchungsnummer_in_json -v",
+      "exit_code": 0,
+      "result": "1 passed",
+      "purpose": "GREEN gate: verify AC2 test passes after implementation"
+    },
+    {
+      "id": "cmd-green-ac3",
+      "command": "uv run pytest tests/test_customer_invoice.py::TestCustomerInvoiceCommand::test_missing_new_object_id_errors -v",
+      "exit_code": 0,
+      "result": "1 passed",
+      "purpose": "GREEN gate: verify AC3 test passes after implementation"
+    },
+    {
+      "id": "cmd-green-ac4",
+      "command": "uv run pytest library/sussdorff-core/skills/business/customer-invoice/tests/test_create_mail_drafts.py::test_passes_buchungsnummer_env -v",
+      "exit_code": 0,
+      "result": "1 passed",
+      "purpose": "GREEN gate: verify AC4 test passes after implementation"
+    },
+    {
+      "id": "cmd-green-ac5",
+      "command": "uv run pytest library/sussdorff-core/skills/business/customer-invoice/tests/test_create_mail_drafts.py::test_subject_includes_both_numbers -v",
+      "exit_code": 0,
+      "result": "1 passed",
+      "purpose": "GREEN gate: verify AC5 test passes after implementation"
+    },
+    {
+      "id": "cmd-full-cli",
+      "command": "uv run pytest tests/ -v --tb=short",
+      "exit_code": 0,
+      "result": "201 passed",
+      "purpose": "Full regression: all CLI tests pass with no regressions"
+    },
+    {
+      "id": "cmd-full-skill",
+      "command": "uv run pytest library/sussdorff-core/skills/business/customer-invoice/tests/ -v --tb=short",
+      "exit_code": 0,
+      "result": "9 passed",
+      "purpose": "Full regression: all customer-invoice skill tests pass with no regressions"
+    },
+    {
+      "id": "cmd-pairfix-parser",
+      "command": "uv run pytest tests/test_customer_invoice.py::TestExtractNewObjectId -v",
+      "exit_code": 0,
+      "result": "4 passed",
+      "purpose": "Pair-loop iter 1: direct unit tests for extract_new_object_id (row[1] booking number, non-numeric raises, empty raises, real parser pipeline via mocked api.request)"
+    },
+    {
+      "id": "cmd-pairfix-full",
+      "command": "uv run pytest tests/ --tb=short",
+      "exit_code": 0,
+      "result": "205 passed",
+      "purpose": "Pair-loop iter 1: full regression after row[2]->row[1] fix and new parser tests"
+    }
+  ],
+  "skipped_checks": [],
+  "artifacts": [
+    ".beads/runs/b43f4659-8e30-4ccb-967b-138055725133/p5-state.json",
+    ".beads/runs/b43f4659-8e30-4ccb-967b-138055725133/implementation_manifest.json",
+    ".beads/runs/b43f4659-8e30-4ccb-967b-138055725133/evidence_ledger.json"
+  ]
+}
