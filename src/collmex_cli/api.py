@@ -21,6 +21,17 @@ class CollmexAuthError(CollmexError):
     """Authentication failed."""
 
 
+def extract_new_object_id(rows: list[list[str]]) -> int:
+    """Extract the Collmex booking number from a NEW_OBJECT_ID response row."""
+    for row in rows:
+        if row and row[0] == "NEW_OBJECT_ID":
+            try:
+                return int(row[2])
+            except (IndexError, ValueError) as exc:
+                raise CollmexError("Invalid NEW_OBJECT_ID response from Collmex") from exc
+    raise CollmexError("Collmex response did not include NEW_OBJECT_ID for created booking")
+
+
 class CollmexAPI:
     """Low-level Collmex API client.
 
