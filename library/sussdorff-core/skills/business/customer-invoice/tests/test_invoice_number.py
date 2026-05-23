@@ -137,3 +137,14 @@ def test_creates_buchhaltung_dir_and_user_only_file(tmp_path: Path) -> None:
 
     assert reservation_file.parent.is_dir()
     assert reservation_file.stat().st_mode & 0o777 == 0o600
+
+
+def test_write_failure_raises(tmp_path: Path) -> None:
+    run_result = Mock(returncode=0, stdout="[]", stderr="")
+
+    with (
+        patch("invoice_number.subprocess.run", return_value=run_result),
+        patch("os.fsync", side_effect=OSError("disk full")),
+    ):
+        with pytest.raises(OSError, match="disk full"):
+            next_invoice_number(2026, 5, tmp_path)
