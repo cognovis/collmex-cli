@@ -128,9 +128,10 @@ collmex customer-invoice \
 collmex customer-invoice --customer-id 10001 --invoice "RE-2024-043" \
   --date 2024-01-15 --net 500.00 --tax 95.00
 
-# Output as JSON
+# Output as JSON — includes buchungsnummer from Collmex NEW_OBJECT_ID response
 collmex customer-invoice --customer-id 10001 --invoice "RE-2024-044" \
   --date 2024-01-15 --net 200.00 --json
+# → {"status": "created", "invoice": {...}, "buchungsnummer": 42}
 ```
 
 After booking, the invoice appears in `open-items --customer` until payment is received and in `bookings` with the debtor and revenue accounts.
@@ -183,6 +184,11 @@ collmex vendor-invoice \
   --date 2024-01-15 \
   --net 100.00 \
   --text "Office supplies"
+
+# Output as JSON — includes buchungsnummer from Collmex NEW_OBJECT_ID response
+collmex vendor-invoice --vendor-id 123 --invoice "INV-2024-001" \
+  --date 2024-01-15 --net 100.00 --json
+# → {"status": "created", "invoice": {...}, "buchungsnummer": 43}
 ```
 
 ### Invoice PDF Rendering
