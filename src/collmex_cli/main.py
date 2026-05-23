@@ -1013,8 +1013,13 @@ def create_customer_zugferd(
     notes: Annotated[str | None, typer.Option("--notes", help="Additional XML notes")] = None,
     cost_note: Annotated[str | None, typer.Option("--cost-note", help="Cost note for the visible invoice")] = None,
     vat_note: Annotated[str | None, typer.Option("--vat-note", help="VAT note for the visible invoice")] = None,
+    template: Annotated[
+        str | None,
+        typer.Option("--template", help="External PDF template Python module"),
+    ] = None,
+    logo: Annotated[str | None, typer.Option("--logo", help="Logo path passed to the external PDF template")] = None,
 ) -> None:
-    """Generate a cognovis customer invoice as ZUGFeRD PDF/A-3."""
+    """Generate a customer invoice as ZUGFeRD PDF/A-3."""
     from pathlib import Path
 
     from .config import get_config
@@ -1071,7 +1076,12 @@ def create_customer_zugferd(
             cost_note=cost_note,
             vat_note=vat_note,
         )
-        pdf_content = render_invoice_pdf(invoice_data, config=config)
+        pdf_content = render_invoice_pdf(
+            invoice_data,
+            config=config,
+            template_path=Path(template) if template else None,
+            logo_path=Path(logo) if logo else None,
+        )
         output_content = embed_xml_in_pdf(pdf_content, xml_content)
 
         output_path = Path(output)

@@ -1,14 +1,14 @@
-"""ReportLab renderer for cognovis customer invoice PDFs."""
+"""ReportLab renderer for customer invoice PDFs."""
 
 from __future__ import annotations
 
+import importlib.util
 from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
 
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
-from reportlab.lib.utils import ImageReader
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfgen import canvas
 
@@ -27,7 +27,7 @@ class InvoiceLineItem:
 
 @dataclass
 class InvoiceData:
-    """Structured data needed to render a cognovis customer invoice."""
+    """Structured data needed to render a customer invoice."""
 
     company_name: str
     company_contact_name: str | None
@@ -67,272 +67,224 @@ def render_invoice_pdf(
     config: CollmexConfig | None = None,
     output_path: Path | None = None,
     logo_path: Path | None = None,
+    template_path: Path | None = None,
 ) -> bytes:
-    """Render a cognovis-branded invoice PDF."""
+    """Render a customer invoice PDF, optionally using an external template module."""
     seller_config = config or get_config()
     validate_seller_config(seller_config)
 
-    resolved_logo_path = logo_path or _default_logo_path()
-    pdf_bytes = _render_reportlab_pdf(invoice_data, seller_config, resolved_logo_path)
+    if template_path is not None:
+        pdf_bytes = _render_template_pdf(template_path, invoice_data, seller_config, logo_path)
+    else:
+        pdf_bytes = _render_generic_reportlab_pdf(invoice_data, seller_config)
 
     if output_path is not None:
         output_path.write_bytes(pdf_bytes)
     return pdf_bytes
 
 
-def _default_logo_path() -> Path:
-    return Path(__file__).parent / "assets" / "cognovis_logo.png"
+def _render_template_pdf(
+    template_path: Path,
+    invoice_data: InvoiceData,
+    config: CollmexConfig,
+    logo_path: Path | None,
+) -> bytes:
+    resolved_template_path = template_path.expanduser().resolve()
+    if not resolved_template_path.exists():
+        raise FileNotFoundError(f"Invoice template not found: {resolved_template_path}")
+
+    spec = importlib.util.spec_from_file_location("collmex_invoice_template", resolved_template_path)
+    if spec is None or spec.loader is None:
+        raise ValueError(f"Could not load invoice template: {resolved_template_path}")
+
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    render = getattr(module, "render_invoice_pdf", None)
+    if not callable(render):
+        raise ValueError(
+            f"Invoice template {resolved_template_path} must define "
+            "render_invoice_pdf(invoice_data, config, logo_path=None)."
+        )
+
+    pdf_bytes = render(invoice_data, config, logo_path=logo_path)
+    if not isinstance(pdf_bytes, bytes):
+        raise TypeError(f"Invoice template {resolved_template_path} returned {type(pdf_bytes).__name__}, expected bytes.")
+    return pdf_bytes
 
 
-def _render_reportlab_pdf(invoice_data: InvoiceData, config: CollmexConfig, logo_path: Path) -> bytes:
+def _render_generic_reportlab_pdf(invoice_data: InvoiceData, config: CollmexConfig) -> bytes:
     buffer = BytesIO()
     pdf = canvas.Canvas(buffer, pagesize=A4, pageCompression=0)
     width, height = A4
 
-    _draw_header(pdf, width, height, config, logo_path)
-    table_top = _draw_recipient_and_metadata(pdf, width, height, invoice_data)
-    table_bottom = _draw_line_items(pdf, table_top, invoice_data)
-    _draw_notes(pdf, table_bottom, invoice_data)
-    _draw_footer(pdf, config)
+    _draw_generic_header(pdf, width, height, config, invoice_data)
+    table_bottom = _draw_generic_line_items(pdf, width, height, invoice_data)
+    _draw_generic_notes(pdf, table_bottom, invoice_data)
+    _draw_generic_footer(pdf, width, config)
 
     pdf.showPage()
     pdf.save()
     return buffer.getvalue()
 
 
-def _draw_header(pdf: canvas.Canvas, width: float, height: float, config: CollmexConfig, logo_path: Path) -> None:
-    if logo_path.exists():
-        logo_width = 55 * mm
-        logo_height = logo_width * 197 / 558
-        pdf.drawImage(
-            ImageReader(str(logo_path)),
-            width - 25 * mm - logo_width,
-            height - 28 * mm,
-            width=logo_width,
-            height=logo_height,
-            mask="auto",
-        )
-
-    sender = (
-        f"{config.seller_name} - project management solutions - "
-        f"{config.seller_street} - {config.seller_zip} {config.seller_city}"
-    )
-    pdf.setFont("Helvetica-Bold", 7)
-    pdf.setFillGray(0.55)
-    pdf.drawString(25 * mm, height - 47 * mm, sender)
-    pdf.setFillGray(0)
-
-
-def _draw_recipient_and_metadata(
+def _draw_generic_header(
     pdf: canvas.Canvas,
     width: float,
     height: float,
+    config: CollmexConfig,
     invoice_data: InvoiceData,
-) -> float:
-    recipient_y = height - 57 * mm
-    recipient_lines = [
-        invoice_data.company_name,
-        invoice_data.company_contact_name,
-        invoice_data.address_line1,
-        f"{invoice_data.postal_code} {invoice_data.city}",
-        _display_customer_country(invoice_data.country),
-        _prefixed("USt-IdNr.: ", invoice_data.vat_number),
-    ]
-
-    pdf.setFont("Helvetica", 11)
-    for line in _present(recipient_lines):
-        pdf.drawString(25 * mm, recipient_y, line)
-        recipient_y -= 6 * mm
-
-    title_y = min(recipient_y - 6 * mm, height - 98 * mm)
-    pdf.setFont("Helvetica", 11)
-    pdf.drawRightString(width - 25 * mm, title_y + 8 * mm, invoice_data.invoice_date)
-
-    pdf.setFont("Helvetica-Bold", 11)
-    pdf.drawString(25 * mm, title_y, f"Rechnung {invoice_data.invoice_nr}")
-
-    detail_y = title_y - 8 * mm
-    pdf.setFont("Helvetica", 11)
-    if invoice_data.delivery_date:
-        pdf.drawString(25 * mm, detail_y, f"Lieferdatum: {invoice_data.delivery_date}")
-        detail_y -= 9 * mm
-
-    return detail_y - 2 * mm
-
-
-def _draw_line_items(pdf: canvas.Canvas, table_top: float, invoice_data: InvoiceData) -> float:
-    max_items = 8
-    if len(invoice_data.line_items) > max_items:
-        raise ValueError(
-            f"Invoice has {len(invoice_data.line_items)} line items but single-page renderer "
-            f"supports at most {max_items}. Split into multiple invoices."
-        )
-
-    left = 25 * mm
-    column_widths = [99.1 * mm, 15.0 * mm, 22.9 * mm, 26.3 * mm]
-    row_height = 10 * mm
-    header_height = 11 * mm
-    summary_height = 9.5 * mm
-    xs = [left]
-    for column_width in column_widths:
-        xs.append(xs[-1] + column_width)
-
-    y = table_top
-    _draw_table_header(pdf, xs, y, header_height, invoice_data.project_ref)
-    y -= header_height
-
-    for item in invoice_data.line_items:
-        item_lines = _wrap_text(item.name, "Helvetica", 10, column_widths[0] - 4 * mm)
-        item_height = max(row_height, (len(item_lines) * 4.6 + 4.2) * mm)
-        _draw_table_row(
-            pdf,
-            xs,
-            y,
-            item_height,
-            [item_lines, [item.quantity], [f"{item.unit_price} €"], [f"{item.amount} €"]],
-            font_name="Helvetica",
-            font_size=10,
-        )
-        y -= item_height
-
-    summary_rows = [
-        ("Summe", invoice_data.subtotal),
-        (f"{invoice_data.vat_rate} % MwSt.", invoice_data.vat_amount),
-        ("Gesamtbetrag", invoice_data.total),
-    ]
-    for label, amount in summary_rows:
-        _draw_table_row(
-            pdf,
-            xs,
-            y,
-            summary_height,
-            [[label], [""], [""], [f"{amount} €"]],
-            font_name="Helvetica",
-            font_size=10,
-        )
-        y -= summary_height
-
-    if y < 54 * mm:
-        raise ValueError("Invoice line items and totals do not fit above the footer.")
-
-    return y
-
-
-def _draw_table_header(
-    pdf: canvas.Canvas,
-    xs: list[float],
-    y: float,
-    height: float,
-    project_ref: str | None,
 ) -> None:
-    pdf.setLineWidth(1)
-    pdf.setFont("Helvetica", 10)
-    pdf.drawString(xs[0] + 2 * mm, y - 7 * mm, _prefixed("Beauftragung: ", project_ref) or "Beauftragung:")
-    pdf.line(xs[0], y - height, xs[1], y - height)
-
-    headers = ["Menge", "Preis", "Summe"]
-    for index, header in enumerate(headers, start=1):
-        pdf.setFillGray(0.70)
-        pdf.rect(xs[index], y - height, xs[index + 1] - xs[index], height, stroke=0, fill=1)
-        pdf.setFillGray(0)
-        pdf.rect(xs[index], y - height, xs[index + 1] - xs[index], height, stroke=1, fill=0)
-        pdf.drawString(xs[index] + 2 * mm, y - 7 * mm, header)
-
-
-def _draw_table_row(
-    pdf: canvas.Canvas,
-    xs: list[float],
-    y: float,
-    height: float,
-    columns: list[list[str]],
-    *,
-    font_name: str,
-    font_size: int,
-) -> None:
-    pdf.setLineWidth(1)
-    for index, lines in enumerate(columns):
-        pdf.rect(xs[index], y - height, xs[index + 1] - xs[index], height, stroke=1, fill=0)
-        pdf.setFont(font_name, font_size)
-        text_y = y - 6.2 * mm
-        for line in lines:
-            if line:
-                pdf.drawString(xs[index] + 2 * mm, text_y, line)
-            text_y -= 4.6 * mm
-
-
-def _draw_notes(pdf: canvas.Canvas, table_bottom: float, invoice_data: InvoiceData) -> float:
-    y = table_bottom - 14 * mm
     left = 25 * mm
-    max_width = 160 * mm
-    pdf.setFont("Helvetica", 10)
-    for note in _present([invoice_data.cost_note, invoice_data.vat_note]):
-        y = _draw_wrapped_lines(pdf, note, left, y, max_width, "Helvetica", 10, 5 * mm)
-        y -= 3 * mm
-    if invoice_data.due_date:
-        payment_note = (
-            f"Zahlbar bis {invoice_data.due_date} ohne Abzug auf unser unten angegebenes Konto. "
-            "Bitte beachten Sie unsere neue Bankverbindung."
-        )
-        y = _draw_wrapped_lines(pdf, payment_note, left, y, max_width, "Helvetica", 10, 5 * mm)
-        y -= 7 * mm
-    pdf.drawString(left, y, "Wir bedanken uns für das entgegen gebrachte Vertrauen.")
-    return y
+    right = width - 25 * mm
+    y = height - 25 * mm
 
+    pdf.setFont("Helvetica-Bold", 14)
+    pdf.drawString(left, y, config.seller_name)
+    pdf.setFont("Helvetica-Bold", 18)
+    pdf.drawRightString(right, y, "Rechnung")
 
-def _draw_footer(pdf: canvas.Canvas, config: CollmexConfig) -> None:
-    left = 25 * mm
-    bottom = 9 * mm
-    height = 20 * mm
-    column_widths = [33.11 * mm, 39.51 * mm, 44.98 * mm, 45.68 * mm]
-    xs = [left]
-    for column_width in column_widths:
-        xs.append(xs[-1] + column_width)
-
-    columns = [
+    pdf.setFont("Helvetica", 9)
+    for line in _present(
         [
-            config.seller_name,
             config.seller_street,
             f"{config.seller_zip} {config.seller_city}",
-            _display_seller_country(config.seller_country),
-        ],
-        _present(
-            [
-                _prefixed("phone: ", config.seller_phone),
-                _prefixed("fax: ", config.seller_fax),
-                config.seller_email,
-                config.seller_web,
-            ]
-        ),
-        _present(
-            [
-                "Geschäftsführung:",
-                config.seller_geschaeftsfuehrung,
-                config.seller_amtsgericht,
-                _prefixed("HRB ", config.seller_hrb),
-                _prefixed("Ust-ID: ", config.seller_vat_id),
-            ]
-        ),
-        _present(
-            [
-                _prefixed("Bankverbindung: ", config.seller_bank_name),
-                "IBAN:",
-                config.seller_iban,
-                _prefixed("BIC-Code: ", config.seller_bic),
-            ]
-        ),
-    ]
+            config.seller_country,
+            config.seller_email,
+            config.seller_web,
+        ]
+    ):
+        y -= 4 * mm
+        pdf.drawString(left, y, line)
 
-    pdf.setLineWidth(0.5)
-    for index, lines in enumerate(columns):
-        pdf.rect(xs[index], bottom, xs[index + 1] - xs[index], height, stroke=1, fill=0)
-        text_y = bottom + height - 4.2 * mm
-        for line_index, line in enumerate(lines):
-            font_name = "Helvetica-Bold" if line_index == 0 else "Helvetica"
-            pdf.setFont(font_name, 7.5)
-            wrapped = _wrap_text(line, font_name, 7.5, xs[index + 1] - xs[index] - 5 * mm)
-            for wrapped_line in wrapped:
-                pdf.drawString(xs[index] + 2 * mm, text_y, wrapped_line)
-                text_y -= 3.3 * mm
+    recipient_y = height - 67 * mm
+    pdf.setFont("Helvetica-Bold", 10)
+    pdf.drawString(left, recipient_y, "Empfänger")
+    recipient_y -= 6 * mm
+    pdf.setFont("Helvetica", 10)
+    for line in _present(
+        [
+            invoice_data.company_name,
+            invoice_data.company_contact_name,
+            invoice_data.address_line1,
+            f"{invoice_data.postal_code} {invoice_data.city}",
+            invoice_data.country,
+            _prefixed("USt-IdNr.: ", invoice_data.vat_number),
+        ]
+    ):
+        pdf.drawString(left, recipient_y, line)
+        recipient_y -= 5 * mm
+
+    meta_y = height - 67 * mm
+    meta_x = width - 78 * mm
+    pdf.setFont("Helvetica", 10)
+    for line in _present(
+        [
+            f"Rechnungs-Nr.: {invoice_data.invoice_nr}",
+            f"Datum: {invoice_data.invoice_date}",
+            _prefixed("Lieferdatum: ", invoice_data.delivery_date),
+            _prefixed("Beauftragung: ", invoice_data.project_ref),
+        ]
+    ):
+        pdf.drawString(meta_x, meta_y, line)
+        meta_y -= 5 * mm
+
+
+def _draw_generic_line_items(pdf: canvas.Canvas, width: float, height: float, invoice_data: InvoiceData) -> float:
+    if len(invoice_data.line_items) > 12:
+        raise ValueError(
+            f"Invoice has {len(invoice_data.line_items)} line items but the generic single-page renderer "
+            "supports at most 12. Provide a custom template or split the invoice."
+        )
+
+    left = 25 * mm
+    right = width - 25 * mm
+    y = height - 122 * mm
+    description_x = left
+    quantity_x = width - 86 * mm
+    price_x = width - 54 * mm
+    amount_x = right
+
+    pdf.setFont("Helvetica-Bold", 9)
+    pdf.drawString(description_x, y, "Position")
+    pdf.drawRightString(quantity_x, y, "Menge")
+    pdf.drawRightString(price_x, y, "Preis")
+    pdf.drawRightString(amount_x, y, "Summe")
+    y -= 2 * mm
+    pdf.line(left, y, right, y)
+    y -= 6 * mm
+
+    pdf.setFont("Helvetica", 9)
+    for item in invoice_data.line_items:
+        lines = _wrap_text(item.name, "Helvetica", 9, quantity_x - description_x - 7 * mm)
+        row_height = max(7 * mm, len(lines) * 4.5 * mm)
+        text_y = y
+        for line in lines:
+            pdf.drawString(description_x, text_y, line)
+            text_y -= 4.5 * mm
+        pdf.drawRightString(quantity_x, y, item.quantity)
+        pdf.drawRightString(price_x, y, f"{item.unit_price} EUR")
+        pdf.drawRightString(amount_x, y, f"{item.amount} EUR")
+        y -= row_height
+
+    y -= 4 * mm
+    pdf.line(width - 95 * mm, y, right, y)
+    y -= 6 * mm
+    _draw_generic_total_row(pdf, width, y, "Zwischensumme:", f"{invoice_data.subtotal} EUR", bold=False)
+    y -= 6 * mm
+    _draw_generic_total_row(pdf, width, y, f"{invoice_data.vat_rate} % MwSt.:", f"{invoice_data.vat_amount} EUR", bold=False)
+    y -= 7 * mm
+    _draw_generic_total_row(pdf, width, y, "Gesamtbetrag:", f"{invoice_data.total} EUR", bold=True)
+    return y
+
+
+def _draw_generic_total_row(pdf: canvas.Canvas, width: float, y: float, label: str, amount: str, *, bold: bool) -> None:
+    pdf.setFont("Helvetica-Bold" if bold else "Helvetica", 9)
+    pdf.drawRightString(width - 55 * mm, y, label)
+    pdf.drawRightString(width - 25 * mm, y, amount)
+
+
+def _draw_generic_notes(pdf: canvas.Canvas, table_bottom: float, invoice_data: InvoiceData) -> None:
+    y = table_bottom - 18 * mm
+    left = 25 * mm
+    max_width = 160 * mm
+    pdf.setFont("Helvetica", 9)
+    for note in _present([invoice_data.cost_note, invoice_data.vat_note]):
+        y = _draw_wrapped_lines(pdf, note, left, y, max_width, "Helvetica", 9, 5 * mm)
+        y -= 2 * mm
+    if invoice_data.due_date:
+        y = _draw_wrapped_lines(
+            pdf,
+            f"Zahlbar bis {invoice_data.due_date} ohne Abzug.",
+            left,
+            y,
+            max_width,
+            "Helvetica",
+            9,
+            5 * mm,
+        )
+        y -= 4 * mm
+    pdf.drawString(left, y, "Vielen Dank.")
+
+
+def _draw_generic_footer(pdf: canvas.Canvas, width: float, config: CollmexConfig) -> None:
+    left = 25 * mm
+    right = width - 25 * mm
+    y = 22 * mm
+    pdf.setFont("Helvetica", 7)
+    footer_parts = _present(
+        [
+            _prefixed("Geschäftsführung: ", config.seller_geschaeftsfuehrung),
+            config.seller_amtsgericht,
+            _prefixed("HRB ", config.seller_hrb),
+            _prefixed("USt-ID: ", config.seller_vat_id),
+            _prefixed("Bank: ", config.seller_bank_name),
+            _prefixed("IBAN: ", config.seller_iban),
+            _prefixed("BIC: ", config.seller_bic),
+        ]
+    )
+    pdf.line(left, y + 5 * mm, right, y + 5 * mm)
+    _draw_wrapped_lines(pdf, " | ".join(footer_parts), left, y, right - left, "Helvetica", 7, 3.5 * mm)
 
 
 def _present(lines: list[str | None]) -> list[str]:
@@ -343,18 +295,6 @@ def _prefixed(prefix: str, value: str | None) -> str | None:
     if not value:
         return None
     return f"{prefix}{value}"
-
-
-def _display_customer_country(country: str | None) -> str | None:
-    if country == "DE":
-        return "Deutschland"
-    return country
-
-
-def _display_seller_country(country: str | None) -> str | None:
-    if country == "DE":
-        return "Germany"
-    return country
 
 
 def _wrap_text(text: str, font_name: str, font_size: float, max_width: float) -> list[str]:

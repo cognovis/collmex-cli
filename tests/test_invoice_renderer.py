@@ -1,4 +1,4 @@
-"""Tests for the cognovis invoice PDF renderer."""
+"""Tests for customer invoice PDF rendering."""
 
 from io import BytesIO
 
@@ -76,23 +76,24 @@ def test_renders_pdf(tmp_path):
     assert b"/Count 1" in pdf_bytes
 
 
-def test_layout_contains_template_sections():
-    """PDF contains the key sections from RechnungCognovis.de.fodt."""
+def test_generic_layout_contains_invoice_sections():
+    """The built-in renderer provides a generic invoice without an external template."""
     pdf_bytes = render_invoice_pdf(_invoice_data(), config=_seller_config())
+    visible_text = "\n".join(page.extract_text() for page in PdfReader(BytesIO(pdf_bytes)).pages)
 
     for expected in [
-        b"cognovis GmbH",
-        b"solutio GmbH",
-        b"Rechnung",
-        b"I2026_04_0001",
-        b"Lieferdatum",
-        b"Beauftragung",
-        b"Menge",
-        b"Preis",
-        b"Summe",
-        b"Gesamtbetrag",
+        "cognovis GmbH",
+        "solutio GmbH",
+        "Rechnung",
+        "I2026_04_0001",
+        "Lieferdatum",
+        "Beauftragung",
+        "Menge",
+        "Preis",
+        "Summe",
+        "Gesamtbetrag",
     ]:
-        assert expected in pdf_bytes
+        assert expected in visible_text
 
 
 def test_footer_pflichtangaben():
@@ -112,17 +113,16 @@ def test_footer_pflichtangaben():
         b"DEUTDEHHXXX",
     ]:
         assert expected in pdf_bytes
-    assert b"Gesch" in pdf_bytes
-    assert b"ftsf" in pdf_bytes
     assert b"Geschaeftsfuehrung" not in pdf_bytes
-    assert "Geschäftsführung:\nMalte Sussdorff" in visible_text
+    assert "Geschäftsführung: Malte Sussdorff" in visible_text
 
 
 def test_notes_use_german_umlauts():
     """Customer-facing German note text uses proper umlauts."""
     pdf_bytes = render_invoice_pdf(_invoice_data(), config=_seller_config())
+    visible_text = "\n".join(page.extract_text() for page in PdfReader(BytesIO(pdf_bytes)).pages)
 
-    assert b"Wir bedanken uns f" in pdf_bytes
+    assert "Reisekosten gemäß Vereinbarung." in visible_text
     assert b"fuer" not in pdf_bytes
     assert b"gemaess" not in pdf_bytes
 
@@ -130,30 +130,42 @@ def test_notes_use_german_umlauts():
 def test_multiline_totals():
     """Multi-position invoice renders columns and the reference invoice totals."""
     pdf_bytes = render_invoice_pdf(_invoice_data(), config=_seller_config())
+    visible_text = "\n".join(page.extract_text() for page in PdfReader(BytesIO(pdf_bytes)).pages)
 
     for expected in [
-        b"Beratung",
-        b"10,00 Std.",
-        b"185,00",
-        b"1.850,00",
-        b"Reisekosten",
-        b"1 Stk.",
-        b"150,00",
-        b"14.064,63",
-        b"2.672,28",
-        b"16.736,91",
+        "Beratung",
+        "10,00 Std.",
+        "185,00",
+        "1.850,00",
+        "Reisekosten",
+        "1 Stk.",
+        "150,00",
+        "14.064,63",
+        "2.672,28",
+        "16.736,91",
     ]:
-        assert expected in pdf_bytes
+        assert expected in visible_text
 
 
-def test_layout_uses_tabular_footer_and_invoice_title():
-    """Invoice layout follows the compact tabular cognovis template."""
-    pdf_bytes = render_invoice_pdf(_invoice_data(), config=_seller_config())
+def test_external_template_renderer_is_loaded(tmp_path):
+    """An external template module can override the built-in generic renderer."""
+    template_path = tmp_path / "invoice_template.py"
+    logo_path = tmp_path / "logo.png"
+    template_path.write_text(
+        """
+def render_invoice_pdf(invoice_data, config, logo_path=None):
+    return f"%PDF template {invoice_data.invoice_nr} {config.seller_name} {logo_path.name}".encode()
+""".strip()
+    )
 
-    assert b"Rechnung I2026_04_0001" in pdf_bytes
-    assert b"Bankverbindung: Fyrst" in pdf_bytes
-    assert b"Zahlbar bis 20.06.2026" in pdf_bytes
-    assert b"Rechnungs-Nr." not in pdf_bytes
+    pdf_bytes = render_invoice_pdf(
+        _invoice_data(),
+        config=_seller_config(),
+        template_path=template_path,
+        logo_path=logo_path,
+    )
+
+    assert pdf_bytes == b"%PDF template I2026_04_0001 cognovis GmbH logo.png"
 
 
 def test_validate_seller_config_reports_missing_fields():
@@ -166,8 +178,8 @@ def test_rejects_too_many_line_items_for_single_page_renderer():
     """Invoices that cannot fit the one-page renderer fail clearly."""
     invoice = _invoice_data()
     invoice.line_items = [
-        InvoiceLineItem(f"Beratung {index}", "1,00 Std.", "185,00", "185,00") for index in range(9)
+        InvoiceLineItem(f"Beratung {index}", "1,00 Std.", "185,00", "185,00") for index in range(13)
     ]
 
-    with pytest.raises(ValueError, match="supports at most 8"):
+    with pytest.raises(ValueError, match="supports at most 12"):
         render_invoice_pdf(invoice, config=_seller_config())
