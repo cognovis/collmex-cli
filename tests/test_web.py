@@ -292,6 +292,48 @@ class TestCollmexWeb:
         with pytest.raises(CollmexWebError, match="Import failed"):
             web.upload_statement(stmt_file, "Geschaeftskonto")
 
+    def test_upload_statement_button_not_found(self, web, tmp_path):
+        """Missing import button raises CollmexWebError."""
+        stmt_file = tmp_path / "test.mt940"
+        stmt_file.write_text("MT940 data")
+
+        web._pcli = MagicMock(side_effect=[
+            "",  # open
+            SAMPLE_SNAPSHOT_LOGGED_IN,  # check login (already logged in)
+            "",  # goto import page
+            SAMPLE_SNAPSHOT_FORM,  # snapshot form
+            "",  # select account
+            SAMPLE_SNAPSHOT_FORM,  # snapshot after select (refs may change)
+            "",  # click Choose File
+            "",  # upload file
+            '- text "Upload complete" [ref=msg1]',  # snapshot after upload
+        ])
+
+        with pytest.raises(CollmexWebError, match="Import button not found"):
+            web.upload_statement(stmt_file, "Geschaeftskonto")
+
+    def test_upload_statement_false_positive(self, web, tmp_path):
+        """Unrecognized result snapshot raises CollmexWebError."""
+        stmt_file = tmp_path / "test.mt940"
+        stmt_file.write_text("MT940 data")
+
+        web._pcli = MagicMock(side_effect=[
+            "",  # open
+            SAMPLE_SNAPSHOT_LOGGED_IN,  # check login (already logged in)
+            "",  # goto import page
+            SAMPLE_SNAPSHOT_FORM,  # snapshot form
+            "",  # select account
+            SAMPLE_SNAPSHOT_FORM,  # snapshot after select (refs may change)
+            "",  # click Choose File
+            "",  # upload file
+            SAMPLE_SNAPSHOT_FORM,  # snapshot after upload
+            "",  # click Importieren
+            '- text "Processing started" [ref=msg1]',  # result snapshot
+        ])
+
+        with pytest.raises(CollmexWebError, match="no success confirmation received"):
+            web.upload_statement(stmt_file, "Geschaeftskonto")
+
     def test_get_pending_bookings(self, web):
         """Pending bookings parses table correctly."""
         web._pcli = MagicMock(side_effect=[
