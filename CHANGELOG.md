@@ -2,6 +2,12 @@
 
 ### Added
 
+- **Race-safe invoice number reservation for `customer-invoice` skill**: `invoice_number.py` now appends each chosen number to a local JSONL reservation file (`~/Documents/cognovis/Buchhaltung/rechnungsnummern-reservierungen.jsonl`) before returning, preventing duplicate numbers when multiple invoice runs overlap.
+  - Reservation is held under `fcntl.flock(LOCK_EX)` so the read-max and append are atomic — no TOCTOU window.
+  - File is created with parents on first use; permissions are enforced to `0o600` (user-only).
+  - `fsync` is called before the lock is released — a write failure raises and does not return the proposed number.
+  - A second concurrent call in the same second sees the prior reservation and returns sequence+1.
+
 - **Buchungsnummer capture for `customer-invoice` and `vendor-invoice`**: Both commands now return the Collmex booking number (`buchungsnummer`) from the `NEW_OBJECT_ID` response field.
   - `collmex customer-invoice --json` output includes `"buchungsnummer": <int>` alongside the existing `status` and `invoice` fields.
   - `collmex vendor-invoice --json` returns the same `"buchungsnummer": <int>` field (symmetric).

@@ -212,7 +212,10 @@ Report:
 ## Resources
 
 - `timing_helper.py`: Timing.app query helper.
-- `invoice_number.py`: next invoice number scanner.
+- `invoice_number.py`: next invoice number scanner. Writes each chosen number to
+  `~/Documents/cognovis/Buchhaltung/rechnungsnummern-reservierungen.jsonl` under an
+  exclusive `fcntl` lock before returning, so parallel skill runs cannot generate
+  duplicate invoice numbers. The file is created automatically if absent.
 - `scripts/create_mail_drafts.sh`: visible Apple Mail drafts.
 - External travel helper:
   `/Users/malte/code/library/sussdorff-core/skills/business/customer-invoice/scripts/travel_costs.py`.
