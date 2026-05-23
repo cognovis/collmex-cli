@@ -5,9 +5,11 @@ from decimal import Decimal
 import json
 from unittest.mock import patch
 
+import pytest
 from typer.testing import CliRunner
 
 from collmex_cli.api import CollmexError
+from collmex_cli.client import CollmexClient
 from collmex_cli.main import app
 from collmex_cli.models import AccountingDocument, CustomerInvoice, OpenItem
 
@@ -37,7 +39,7 @@ class TestVatCalculation:
     def test_explicit_tax_overrides_rate(self, mock_client_cls):
         """--tax is used directly instead of the --tax-rate calculation."""
         instance = mock_client_cls.return_value.__enter__.return_value
-        instance.create_customer_invoice.return_value = []
+        instance.create_customer_invoice.return_value = 12345
 
         result = runner.invoke(
             app,
@@ -70,7 +72,7 @@ class TestCustomerInvoiceCommand:
     def test_books_receivable(self, mock_client_cls):
         """customer-invoice sends a CMXUMS row that creates a receivable."""
         instance = mock_client_cls.return_value.__enter__.return_value
-        instance.create_customer_invoice.return_value = [["MESSAGE", "0", "OK"]]
+        instance.create_customer_invoice.return_value = 12345
 
         result = runner.invoke(
             app,
@@ -101,6 +103,51 @@ class TestCustomerInvoiceCommand:
         assert row[6] == "19,00"
         assert row[14] == ""
         assert row[18] == "8400"
+
+    @patch("collmex_cli.main.CollmexClient", autospec=True)
+    def test_buchungsnummer_in_json(self, mock_client_cls):
+        """customer-invoice --json includes the Collmex booking number."""
+        instance = mock_client_cls.return_value.__enter__.return_value
+        instance.create_customer_invoice.return_value = 12345
+
+        result = runner.invoke(
+            app,
+            [
+                "customer-invoice",
+                "--customer-id",
+                "123",
+                "--invoice",
+                "I2026_05_0001",
+                "--date",
+                "2026-05-21",
+                "--net",
+                "100.00",
+                "--json",
+            ],
+        )
+
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert data["buchungsnummer"] == 12345
+
+    @patch("collmex_cli.client.CollmexAPI")
+    def test_missing_new_object_id_errors(self, mock_api_cls):
+        """customer invoice creation requires a NEW_OBJECT_ID response row."""
+        mock_api = mock_api_cls.return_value
+        mock_api.request.return_value = [["MESSAGE", "S", "0", "OK"]]
+
+        client = CollmexClient.__new__(CollmexClient)
+        client.api = mock_api
+        invoice = CustomerInvoice(
+            customer_id=123,
+            invoice_number="I2026_05_0001",
+            invoice_date=date(2026, 5, 21),
+            net_amount_full_tax=Decimal("100.00"),
+            tax_full=Decimal("19.00"),
+        )
+
+        with pytest.raises(CollmexError, match="NEW_OBJECT_ID"):
+            client.create_customer_invoice(invoice)
 
     @patch("collmex_cli.main.CollmexClient", autospec=True)
     def test_duplicate_number_rejected(self, mock_client_cls):

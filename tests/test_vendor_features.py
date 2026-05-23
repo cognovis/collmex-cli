@@ -354,6 +354,34 @@ class TestVendorUpdateCommand:
 
 
 # =============================================================================
+# Bead collmex-cli-c12.5: vendor invoice Buchungsnummer
+# =============================================================================
+
+
+class TestVendorInvoiceCommand:
+    """Tests for vendor-invoice booking number output."""
+
+    @patch("collmex_cli.main.CollmexClient", autospec=True)
+    def test_vendor_invoice_buchungsnummer_in_json(self, mock_client_cls):
+        """vendor-invoice --json includes the Collmex booking number."""
+        instance = mock_client_cls.return_value.__enter__.return_value
+        instance.create_vendor_invoice.return_value = 67890
+
+        result = runner.invoke(app, [
+            "vendor-invoice",
+            "--vendor-id", "42",
+            "--invoice", "R-2026-001",
+            "--date", "2026-05-21",
+            "--net", "100.00",
+            "--json",
+        ])
+
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert data["buchungsnummer"] == 67890
+
+
+# =============================================================================
 # Bead collmex-cli-fjf: zugferd-create validation
 # =============================================================================
 
