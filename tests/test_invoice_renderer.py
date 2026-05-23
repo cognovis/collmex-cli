@@ -1,6 +1,9 @@
 """Tests for the cognovis invoice PDF renderer."""
 
+from io import BytesIO
+
 import pytest
+from pypdf import PdfReader
 
 from collmex_cli.config import CollmexConfig
 from collmex_cli.invoice_renderer import (
@@ -95,6 +98,7 @@ def test_layout_contains_template_sections():
 def test_footer_pflichtangaben():
     """Footer includes the mandatory legal and bank details from seller config."""
     pdf_bytes = render_invoice_pdf(_invoice_data(), config=_seller_config())
+    visible_text = "\n".join(page.extract_text() for page in PdfReader(BytesIO(pdf_bytes)).pages)
 
     for expected in [
         b"Schroedersweg 27",
@@ -111,6 +115,7 @@ def test_footer_pflichtangaben():
     assert b"Gesch" in pdf_bytes
     assert b"ftsf" in pdf_bytes
     assert b"Geschaeftsfuehrung" not in pdf_bytes
+    assert "Geschäftsführung:\nMalte Sussdorff" in visible_text
 
 
 def test_notes_use_german_umlauts():

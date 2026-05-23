@@ -305,7 +305,8 @@ def _draw_footer(pdf: canvas.Canvas, config: CollmexConfig) -> None:
         ),
         _present(
             [
-                _prefixed("Geschäftsführung: ", config.seller_geschaeftsfuehrung),
+                "Geschäftsführung:",
+                config.seller_geschaeftsfuehrung,
                 config.seller_amtsgericht,
                 _prefixed("HRB ", config.seller_hrb),
                 _prefixed("Ust-ID: ", config.seller_vat_id),
