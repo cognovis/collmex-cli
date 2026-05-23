@@ -327,8 +327,9 @@ class CollmexWeb:
         submit_ref = _find_ref_by_text(snapshot, "Importieren")
         if not submit_ref:
             submit_ref = _find_ref_by_text(snapshot, "Import")
-        if submit_ref:
-            self._pcli("click", submit_ref)
+        if not submit_ref:
+            raise CollmexWebError("Import button not found — cannot submit upload form")
+        self._pcli("click", submit_ref)
 
         # Check result
         snapshot = self._snapshot()
@@ -336,7 +337,6 @@ class CollmexWeb:
             error_msg = _extract_message(snapshot, "Fehler")
             raise CollmexWebError(f"Import failed: {error_msg}")
 
-        # Both "importiert" and "keine neuen" count as success
         if "keine neuen" in snapshot.lower():
             return {
                 "status": "ok",
@@ -345,8 +345,14 @@ class CollmexWeb:
                 "account": account_name,
             }
 
-        success_msg = _extract_message(snapshot, "importiert") or "Import completed"
-        return {"status": "ok", "message": success_msg, "file": str(file), "account": account_name}
+        if "importiert" in snapshot.lower():
+            success_msg = _extract_message(snapshot, "importiert") or "Import completed"
+            return {"status": "ok", "message": success_msg, "file": str(file), "account": account_name}
+
+        raise CollmexWebError(
+            "Import submitted but no success confirmation received — "
+            "check Collmex web UI to verify whether data was imported"
+        )
 
     def get_pending_bookings(self, account_name: str) -> list[dict]:
         """Get pending bookings ("Zu buchen") for a bank account.
