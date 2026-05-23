@@ -1,5 +1,7 @@
 import calendar
+from datetime import UTC, datetime
 import json
+import os
 from pathlib import Path
 import subprocess
 import re
@@ -65,9 +67,7 @@ def _collmex_highest_sequence(year: int, month: int) -> int:
 
 def _reservation_highest_sequence(year: int, month: int) -> int:
     """Return the highest invoice sequence found in the local reservation file."""
-    reservation_file = (
-        Path.home() / "Documents" / "cognovis" / "Buchhaltung" / "rechnungsnummern-reservierungen.jsonl"
-    )
+    reservation_file = _reservation_file_path()
     if not reservation_file.exists():
         return 0
 
@@ -91,6 +91,23 @@ def _reservation_highest_sequence(year: int, month: int) -> int:
     return highest_seq
 
 
+def _reservation_file_path() -> Path:
+    """Return the hardcoded local invoice-number reservation file path."""
+    return Path.home() / "Documents" / "cognovis" / "Buchhaltung" / "rechnungsnummern-reservierungen.jsonl"
+
+
+def _reserve_invoice_number(invoice_number: str) -> None:
+    """Append a durable local reservation for an invoice number."""
+    reservation_file = _reservation_file_path()
+    reservation_file.parent.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now(tz=UTC).replace(tzinfo=None).isoformat() + "Z"
+    record = {"invoice_number": invoice_number, "timestamp": timestamp}
+    with open(reservation_file, "a", encoding="utf-8") as file:
+        file.write(json.dumps(record, sort_keys=True) + "\n")
+        file.flush()
+        os.fsync(file.fileno())
+
+
 def next_invoice_number(year: int, month: int, kunden_root: Path) -> str:
     """Return the next invoice number for the given year and month.
 
@@ -111,4 +128,6 @@ def next_invoice_number(year: int, month: int, kunden_root: Path) -> str:
                 continue
             highest_seq = max(highest_seq, int(match.group("seq")))
 
-    return invoice_number_from_parts(year, month, highest_seq + 1)
+    invoice_number = invoice_number_from_parts(year, month, highest_seq + 1)
+    _reserve_invoice_number(invoice_number)
+    return invoice_number
