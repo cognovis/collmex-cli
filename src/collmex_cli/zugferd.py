@@ -88,7 +88,7 @@ def _visible_page_signature(reader: PdfReader) -> list[tuple[tuple[float, ...], 
     for page in reader.pages:
         contents = page.get_contents()
         content_bytes = contents.get_data() if contents is not None else b""
-        page_geometry = tuple(float(coordinate) for coordinate in (*page.mediabox, *page.cropbox))
+        page_geometry = tuple(round(float(coordinate), 6) for coordinate in (*page.mediabox, *page.cropbox))
         signatures.append((page_geometry, page.rotation, content_bytes))
     return signatures
 

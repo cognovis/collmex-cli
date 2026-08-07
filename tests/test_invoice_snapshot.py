@@ -212,6 +212,44 @@ def test_invoice_snapshot_generates_valid_coherent_document_pair() -> None:
             assert metadata["pdfaid:conformance"] == "B"
 
 
+def test_openoffice_fractional_page_geometry_survives_embedding() -> None:
+    """Insignificant PDF number serialization must not reject an unchanged OpenOffice page."""
+    content = b"BT /F1 12 Tf 72 770 Td (Existing OpenOffice invoice) Tj ET"
+    objects = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        (
+            b"<< /Type /Page /Parent 2 0 R "
+            b"/MediaBox [0 0 595.303937007874 841.889763779528] "
+            b"/CropBox [0 0 595.303937007874 841.889763779528] "
+            b"/Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>"
+        ),
+        b"<< /Length " + str(len(content)).encode() + b" >>\nstream\n" + content + b"\nendstream",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    ]
+    original = bytearray(b"%PDF-1.4\n")
+    offsets = []
+    for object_id, pdf_object in enumerate(objects, start=1):
+        offsets.append(len(original))
+        original.extend(f"{object_id} 0 obj\n".encode())
+        original.extend(pdf_object)
+        original.extend(b"\nendobj\n")
+    xref_offset = len(original)
+    original.extend(f"xref\n0 {len(objects) + 1}\n".encode())
+    original.extend(b"0000000000 65535 f \n")
+    for offset in offsets:
+        original.extend(f"{offset:010d} 00000 n \n".encode())
+    original.extend(
+        f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\n"
+        f"startxref\n{xref_offset}\n%%EOF\n".encode()
+    )
+    original_pdf = bytes(original)
+
+    documents = generate_invoice_documents(InvoiceSnapshot.model_validate(_snapshot()), original_pdf)
+
+    assert _visible_page_content(documents.pdf) == _visible_page_content(original_pdf)
+
+
 @pytest.mark.parametrize(
     ("document_kind", "type_code"),
     [("invoice", "380"), ("credit_note", "381")],
