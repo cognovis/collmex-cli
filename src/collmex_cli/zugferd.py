@@ -6,11 +6,13 @@ Uses python-drafthorse to generate EN 16931 compliant XML.
 from __future__ import annotations
 
 import base64
+import tempfile
+from dataclasses import dataclass
 from datetime import date, timedelta
 from decimal import Decimal
 from io import BytesIO
 from pathlib import Path
-import tempfile
+from typing import TYPE_CHECKING
 
 from drafthorse.models.accounting import ApplicableTradeTax
 from drafthorse.models.document import Document
@@ -21,8 +23,11 @@ from drafthorse.models.tradelines import LineItem
 
 from .config import CollmexConfig, get_config
 from .invoice_renderer import InvoiceData, InvoiceLineItem, validate_seller_config
+from .invoice_snapshot import InvoiceSnapshot
 from .models import Customer, Vendor
 
+if TYPE_CHECKING:
+    from pypdf import PdfReader
 
 _SRGB_ICC_PROFILE_BASE64 = (
     "AAACTGxjbXMEQAAAbW50clJHQiBYWVogB+oABQAVAA4AFQACYWNzcEFQUEwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPbW"
@@ -35,6 +40,181 @@ _SRGB_ICC_PROFILE_BASE64 = (
     "AAAAYpcAALeHAAAY2XBhcmEAAAAAAAMAAAACZmYAAPKnAAANWQAAE9AAAApbY2hybQAAAAAAAwAAAACj1wAAVHsAAEzNAACZ"
     "mgAAJmYAAA9c"
 )
+
+
+@dataclass(frozen=True, slots=True)
+class GeneratedInvoiceDocuments:
+    """Validated hybrid PDF and byte-identical EN 16931 XML sidecar."""
+
+    pdf: bytes
+    xml: bytes
+
+
+def generate_invoice_documents(snapshot: InvoiceSnapshot, visible_pdf: bytes) -> GeneratedInvoiceDocuments:
+    """Generate and validate one coherent ZUGFeRD document pair.
+
+    Args:
+        snapshot: Normalized source invoice or credit-note data
+        visible_pdf: Existing human-readable invoice PDF to enrich
+
+    Returns:
+        Validated hybrid PDF/A-3B and XML sidecar bytes
+    """
+    from facturx import xml_check_xsd
+    from pypdf import PdfReader
+
+    original_page_signature = _visible_page_signature(PdfReader(BytesIO(visible_pdf)))
+    xml_content = _create_snapshot_xml(snapshot)
+    if not xml_check_xsd(xml_content, flavor="factur-x", level="en16931"):
+        raise ValueError(f"Invoice {snapshot.object_id} has invalid fields: xml_schema")
+    _validate_en16931_schematron(snapshot.object_id, xml_content)
+
+    pdf_content = embed_xml_in_pdf(visible_pdf, xml_content)
+    reader = PdfReader(BytesIO(pdf_content))
+    if _visible_page_signature(reader) != original_page_signature:
+        raise ValueError(f"Invoice {snapshot.object_id} has invalid fields: visible_pdf_pages")
+    embedded = reader.attachments.get("factur-x.xml")
+    if isinstance(embedded, list):
+        embedded = embedded[0]
+    if embedded != xml_content:
+        raise ValueError(f"Invoice {snapshot.object_id} has invalid fields: embedded_xml")
+    _validate_pdfa3b(snapshot.object_id, pdf_content)
+    return GeneratedInvoiceDocuments(pdf=pdf_content, xml=xml_content)
+
+
+def _visible_page_signature(reader: PdfReader) -> list[tuple[tuple[float, ...], int, bytes]]:
+    """Capture page geometry, rotation, and drawing commands before enrichment."""
+    signatures: list[tuple[tuple[float, ...], int, bytes]] = []
+    for page in reader.pages:
+        contents = page.get_contents()
+        content_bytes = contents.get_data() if contents is not None else b""
+        page_geometry = tuple(round(float(coordinate), 6) for coordinate in (*page.mediabox, *page.cropbox))
+        signatures.append((page_geometry, page.rotation, content_bytes))
+    return signatures
+
+
+def _create_snapshot_xml(snapshot: InvoiceSnapshot) -> bytes:
+    """Serialize one normalized outgoing invoice snapshot as EN 16931 CII."""
+    doc = Document()
+    doc.context.guideline_parameter.id = "urn:cen.eu:en16931:2017"
+    doc.header.id = snapshot.document_number
+    doc.header.type_code = "380" if snapshot.document_kind == "invoice" else "381"
+    doc.header.issue_date_time = snapshot.issue_date
+    doc.trade.delivery.event.occurrence = snapshot.delivery_date
+
+    doc.trade.agreement.seller.id = str(snapshot.seller.object_id)
+    doc.trade.agreement.seller.name = snapshot.seller.name
+    doc.trade.agreement.seller.address.line_one = snapshot.seller.street
+    doc.trade.agreement.seller.address.postcode = snapshot.seller.postal_code
+    doc.trade.agreement.seller.address.city_name = snapshot.seller.city
+    doc.trade.agreement.seller.address.country_id = snapshot.seller.country_code
+    if snapshot.seller.vat_id:
+        seller_tax_registration = TaxRegistration()
+        seller_tax_registration.id = ("VA", snapshot.seller.vat_id)
+        doc.trade.agreement.seller.tax_registrations.add(seller_tax_registration)
+
+    doc.trade.agreement.buyer.id = str(snapshot.buyer.object_id)
+    doc.trade.agreement.buyer.name = snapshot.buyer.name
+    doc.trade.agreement.buyer.address.line_one = snapshot.buyer.street
+    doc.trade.agreement.buyer.address.postcode = snapshot.buyer.postal_code
+    doc.trade.agreement.buyer.address.city_name = snapshot.buyer.city
+    doc.trade.agreement.buyer.address.country_id = snapshot.buyer.country_code
+    if snapshot.buyer.vat_id:
+        buyer_tax_registration = TaxRegistration()
+        buyer_tax_registration.id = ("VA", snapshot.buyer.vat_id)
+        doc.trade.agreement.buyer.tax_registrations.add(buyer_tax_registration)
+
+    for index, item in enumerate(snapshot.lines, start=1):
+        line = LineItem()
+        line.document.line_id = str(index)
+        line.product.name = item.description
+        line.agreement.net.amount = item.unit_price
+        line.agreement.net.basis_quantity = (Decimal("1.000"), item.unit_code)
+        line.delivery.billed_quantity = (item.quantity, item.unit_code)
+        line.settlement.trade_tax.type_code = "VAT"
+        line.settlement.trade_tax.category_code = item.effective_tax_category_code
+        line.settlement.trade_tax.rate_applicable_percent = item.tax_rate
+        line.settlement.monetary_summation.total_amount = item.line_total
+        doc.trade.items.add(line)
+
+    doc.trade.settlement.currency_code = snapshot.currency
+    payment_means = PaymentMeans()
+    payment_means.type_code = snapshot.payment_means_type_code
+    if snapshot.payment_means_type_code == "58":
+        payment_means.payee_account.iban = snapshot.payee_iban
+        payment_means.payee_institution.bic = snapshot.payee_bic
+    doc.trade.settlement.payment_means.add(payment_means)
+
+    payment_terms = PaymentTerms()
+    payment_terms.description = snapshot.payment_terms
+    payment_terms.due = snapshot.due_date
+    doc.trade.settlement.terms.add(payment_terms)
+
+    for tax in snapshot.taxes:
+        trade_tax = ApplicableTradeTax()
+        trade_tax.calculated_amount = tax.tax_amount
+        trade_tax.basis_amount = tax.basis_amount
+        trade_tax.type_code = "VAT"
+        trade_tax.category_code = tax.effective_category_code
+        trade_tax.rate_applicable_percent = tax.rate
+        if tax.effective_category_code == "AE":
+            trade_tax.exemption_reason = "Reverse charge"
+        elif tax.effective_category_code == "G":
+            trade_tax.exemption_reason = "Export outside the EU"
+        doc.trade.settlement.trade_tax.add(trade_tax)
+
+    totals = doc.trade.settlement.monetary_summation
+    totals.line_total = snapshot.totals.line_total
+    totals.charge_total = Decimal("0.00")
+    totals.allowance_total = Decimal("0.00")
+    totals.tax_basis_total = snapshot.totals.tax_basis_total
+    totals.tax_total = (snapshot.totals.tax_total, snapshot.currency)
+    totals.grand_total = snapshot.totals.grand_total
+    totals.prepaid_total = Decimal("0.00")
+    totals.due_amount = snapshot.totals.due_amount
+    return doc.serialize(schema="FACTUR-X_EN16931")
+
+
+def _validate_pdfa3b(object_id: int, pdf_content: bytes) -> None:
+    """Verify required PDF/A-3B metadata and the embedded-file relationship."""
+    import pikepdf
+    from pikepdf import Name
+
+    try:
+        with pikepdf.open(BytesIO(pdf_content)) as pdf:
+            with pdf.open_metadata() as metadata:
+                metadata_valid = metadata.get("pdfaid:part") == "3" and metadata.get("pdfaid:conformance") == "B"
+            output_intents = pdf.Root.get("/OutputIntents", [])
+            embedded_names = pdf.Root["/Names"]["/EmbeddedFiles"]["/Names"]
+            relationship_valid = embedded_names[1].get("/AFRelationship") == Name("/Alternative")
+            if not metadata_valid or not output_intents or not relationship_valid:
+                raise ValueError
+    except (KeyError, TypeError, ValueError, pikepdf.PdfError) as exc:
+        raise ValueError(f"Invoice {object_id} has invalid fields: pdfa3b") from exc
+
+
+def _validate_en16931_schematron(object_id: int, xml_content: bytes) -> None:
+    """Run the bundled EN 16931 Schematron locally with SaxonC."""
+    import importlib.resources
+    import xml.etree.ElementTree as ET
+
+    from saxonche import PySaxonApiError, PySaxonProcessor
+
+    stylesheet = importlib.resources.files("facturx").joinpath(
+        "xsd_and_schematron/facturx-en16931/Factur-X_1.09_EN16931.xsl"
+    )
+    try:
+        with PySaxonProcessor(license=False) as processor:
+            executable = processor.new_xslt30_processor().compile_stylesheet(stylesheet_file=str(stylesheet))
+            source = processor.parse_xml(xml_text=xml_content.decode("utf-8"))
+            result = executable.transform_to_string(xdm_node=source)
+        root = ET.fromstring(result)
+        invalid = root.findall(".//{http://purl.oclc.org/dsdl/svrl}failed-assert")
+        invalid.extend(root.findall(".//{http://purl.oclc.org/dsdl/svrl}successful-report"))
+        if invalid:
+            raise ValueError
+    except (ET.ParseError, PySaxonApiError, TypeError, ValueError) as exc:
+        raise ValueError(f"Invoice {object_id} has invalid fields: en16931_rules") from exc
 
 
 def validate_vendor_for_zugferd(vendor: Vendor) -> list[str]:
@@ -318,7 +498,7 @@ def _add_line_items(doc: Document, line_items: list[dict]) -> tuple[Decimal, dic
         total_net += line_total
 
         rate_key = str(tax_rate)
-        tax_amount = (line_total * tax_rate / Decimal("100")).quantize(Decimal("0.01"))
+        tax_amount = (line_total * tax_rate / Decimal(100)).quantize(Decimal("0.01"))
         if rate_key in tax_amounts:
             basis, tax = tax_amounts[rate_key]
             tax_amounts[rate_key] = (basis + line_total, tax + tax_amount)
@@ -367,7 +547,7 @@ def _calculate_totals(line_items: list[dict]) -> dict[str, Decimal]:
         line_net = _money_decimal(item["quantity"]) * _money_decimal(item["unit_price"])
         item_tax_rate = _money_decimal(item.get("tax_rate", "19.00"))
         net += line_net
-        tax += line_net * item_tax_rate / Decimal("100")
+        tax += line_net * item_tax_rate / Decimal(100)
         tax_rate = item_tax_rate
     return {"net": net, "tax": tax, "gross": net + tax, "tax_rate": tax_rate}
 
@@ -544,7 +724,7 @@ def create_zugferd_xml(
 
         # Accumulate tax by rate
         rate_key = str(tax_rate)
-        tax_amount = line_total * tax_rate / Decimal("100")
+        tax_amount = line_total * tax_rate / Decimal(100)
         if rate_key in tax_amounts:
             basis, tax = tax_amounts[rate_key]
             tax_amounts[rate_key] = (basis + line_total, tax + tax_amount)
