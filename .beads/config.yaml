@@ -62,7 +62,7 @@ no-auto-import: true
 # - github.org
 # - github.repo
 
-dolt.shared-server: true
+dolt.shared-server: false
 
 import.auto: false
 
