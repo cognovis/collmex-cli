@@ -33,31 +33,15 @@ bd close <id>         # Complete work
 bd sync               # Sync with git
 ```
 
-## Landing the Plane (Session Completion)
+## Session Completion
 
-**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
-
-**MANDATORY WORKFLOW:**
-
-1. **File issues for remaining work** - Create issues for anything that needs follow-up
-2. **Run quality gates** (if code changed) - Tests, linters, builds
-3. **Update issue status** - Close finished work, update in-progress items
-4. **PUSH TO REMOTE** - This is MANDATORY:
-   ```bash
-   git pull --rebase
-   bd sync
-   git push
-   git status  # MUST show "up to date with origin"
-   ```
-5. **Clean up** - Clear stashes, prune remote branches
-6. **Verify** - All changes committed AND pushed
-7. **Hand off** - Provide context for next session
-
-**CRITICAL RULES:**
-- Work is NOT complete until `git push` succeeds
-- NEVER stop before pushing - that leaves work stranded locally
-- NEVER say "ready to push when you are" - YOU must push
-- If push fails, resolve and retry until it succeeds
+Use the installed session-close skill and `ccore session-close` in the active
+delivery session after required verification and review. The CLI owns integration,
+Bead finalization, synchronization, memory and cleanup for the exact supplied
+resources. Do not run a parallel manual completion recipe. Resume a typed
+retryable stop using its Session Close ID; publication awaiting human review
+is not terminal completion. Report the CLI result and any project-specific
+postconditions. Preserve existing authorization for the same concrete scope.
 
 
 <!-- BEGIN BEADS INTEGRATION -->
