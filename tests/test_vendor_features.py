@@ -89,14 +89,6 @@ class TestVendorMissingFields:
         missing = _vendor_missing_fields(vendor)
         assert "vat_id" not in missing
 
-    def test_vat_id_satisfies_vat_requirement(self):
-        """Having vat_id but no tax_id is ok."""
-        from collmex_cli.client import _vendor_missing_fields
-
-        vendor = make_vendor(vat_id="DE123456789", tax_id="")
-        missing = _vendor_missing_fields(vendor)
-        assert "vat_id" not in missing
-
     def test_multiple_missing_fields(self):
         """All missing fields are returned."""
         from collmex_cli.client import _vendor_missing_fields

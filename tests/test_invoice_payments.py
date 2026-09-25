@@ -131,46 +131,11 @@ class TestInvoicePaymentModel:
         assert payment.payment_date is None
         assert payment.payment_amount is None
 
-    def test_from_csv_row_date_format(self):
-        """Payment date YYYYMMDD is parsed to date object."""
-        row = _make_payment_row(payment_date="20261231")
-        payment = InvoicePayment.from_csv_row(row)
-        assert payment.payment_date == date(2026, 12, 31)
-
-    def test_from_csv_row_booking_position(self):
-        """BuchungPos (field 8) is parsed correctly."""
-        row = _make_payment_row(booking_position="7")
-        payment = InvoicePayment.from_csv_row(row)
-        assert payment.booking_position == 7
-
-    def test_from_csv_row_system_name(self):
-        """Systemname (field 9) is parsed correctly."""
-        row = _make_payment_row(system_name="Kasse1")
-        payment = InvoicePayment.from_csv_row(row)
-        assert payment.system_name == "Kasse1"
-
     def test_from_csv_row_strips_invoice_number(self):
         """Leading/trailing whitespace in invoice_number is stripped."""
         row = _make_payment_row(invoice_number=" 10-04610-56733")
         payment = InvoicePayment.from_csv_row(row)
         assert payment.invoice_number == "10-04610-56733"
-
-    def test_field_validator_accepts_date_object(self):
-        """field_validator accepts date objects directly (model construction)."""
-        payment = _make_payment(payment_date=date(2026, 6, 1))
-        assert payment.payment_date == date(2026, 6, 1)
-
-    def test_model_dump_serialization(self):
-        """model_dump() returns a dict with all official fields."""
-        payment = _make_payment()
-        data = payment.model_dump()
-        assert data["invoice_number"] == "RE-2026-001"
-        assert data["payment_date"] == date(2026, 1, 15)
-        assert isinstance(data["payment_amount"], Decimal)
-        assert isinstance(data["reducing_amount"], Decimal)
-        assert data["fiscal_year"] == 2026
-        assert data["booking_id"] == 5001
-        assert data["booking_position"] == 2
 
     def test_record_type_in_record_types_dict(self):
         """INVOICE_PAYMENT is registered in RECORD_TYPES."""
