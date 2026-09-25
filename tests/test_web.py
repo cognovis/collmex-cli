@@ -11,7 +11,6 @@ from collmex_cli.main import app
 from collmex_cli.web import (
     CollmexWeb,
     CollmexWebError,
-    PlaywrightCliError,
     _extract_ref,
     _find_all_refs_by_role,
     _find_ref_by_role,
@@ -156,8 +155,6 @@ class TestCollmexWeb:
         )
         w = CollmexWeb(config=config, app_config=app_cfg, session="test-session")
         # Override _snapshot to just call _pcli("snapshot") so side_effect works
-        original_pcli_ref = None
-
         def fake_snapshot():
             return w._pcli("snapshot")
 

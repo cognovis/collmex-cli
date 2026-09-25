@@ -102,7 +102,7 @@ def _render_template_pdf(
 
     render = getattr(module, "render_invoice_pdf", None)
     if not callable(render):
-        raise ValueError(
+        raise ValueError(  # noqa: TRY004 - preserve the template validation API.
             f"Invoice template {resolved_template_path} must define "
             "render_invoice_pdf(invoice_data, config, logo_path=None)."
         )

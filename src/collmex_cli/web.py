@@ -11,7 +11,6 @@ Web credentials are read from ~/.config/collmex-cli/config.toml [credentials] se
 
 from __future__ import annotations
 
-import json
 import re
 import subprocess
 from pathlib import Path
@@ -37,7 +36,7 @@ def _pcli(*args: str, session: str = SESSION) -> str:
     Raises PlaywrightCliError on non-zero exit.
     """
     cmd = ["playwright-cli", f"-s={session}", *args]
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=30, check=False)
     if result.returncode != 0:
         raise PlaywrightCliError(
             f"playwright-cli {' '.join(args)} failed (rc={result.returncode}): "

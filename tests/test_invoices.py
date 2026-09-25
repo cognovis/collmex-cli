@@ -4,7 +4,6 @@ from datetime import date
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
-import pytest
 from typer.testing import CliRunner
 
 from collmex_cli.client import CollmexClient
@@ -326,7 +325,7 @@ class TestInvoicesCli:
                     InvoiceLine(
                         position=1,
                         text="Development",
-                        quantity=Decimal("10"),
+                        quantity=Decimal(10),
                         unit="h",
                         price=Decimal("50.00"),
                         total_gross=Decimal("595.00"),

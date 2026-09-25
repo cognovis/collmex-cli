@@ -2,7 +2,7 @@
 
 import csv
 import io
-from typing import Any
+from typing import Any, Self
 
 import httpx
 
@@ -81,10 +81,10 @@ class CollmexAPI:
             self._client.close()
             self._client = None
 
-    def __enter__(self) -> "CollmexAPI":
+    def __enter__(self) -> Self:
         return self
 
-    def __exit__(self, *args: Any) -> None:
+    def __exit__(self, *args: object) -> None:
         self.close()
 
     def _encode_csv(self, rows: list[list[str]]) -> bytes:

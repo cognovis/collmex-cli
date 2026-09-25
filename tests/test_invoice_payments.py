@@ -72,17 +72,17 @@ def _make_payment_row(
 
 def _make_payment(**kwargs) -> InvoicePayment:
     """Create an InvoicePayment with sensible defaults."""
-    defaults = dict(
-        record_type="INVOICE_PAYMENT",
-        invoice_number="RE-2026-001",
-        payment_date=date(2026, 1, 15),
-        payment_amount=Decimal("1190.00"),
-        reducing_amount=Decimal("1190.00"),
-        fiscal_year=2026,
-        booking_id=5001,
-        booking_position=2,
-        system_name="",
-    )
+    defaults = {
+        "record_type": "INVOICE_PAYMENT",
+        "invoice_number": "RE-2026-001",
+        "payment_date": date(2026, 1, 15),
+        "payment_amount": Decimal("1190.00"),
+        "reducing_amount": Decimal("1190.00"),
+        "fiscal_year": 2026,
+        "booking_id": 5001,
+        "booking_position": 2,
+        "system_name": "",
+    }
     defaults.update(kwargs)
     return InvoicePayment(**defaults)
 

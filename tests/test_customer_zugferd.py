@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
+import json
+import xml.etree.ElementTree as ET
 from datetime import date
 from decimal import Decimal
 from io import BytesIO
-import json
-import xml.etree.ElementTree as ET
 from unittest.mock import patch
 
+import pikepdf
 import pytest
 from facturx import xml_check_schematron
-import pikepdf
 from pikepdf import Name
 from pypdf import PdfReader
 from typer.testing import CliRunner
@@ -27,7 +27,6 @@ from collmex_cli.zugferd import (
     embed_xml_in_pdf,
     validate_customer_for_zugferd,
 )
-
 
 runner = CliRunner()
 
@@ -252,10 +251,9 @@ def test_output_pdf_contains_pdfa3b_xmp_metadata():
     """PDF output declares PDF/A-3B conformance in XMP metadata."""
     output_bytes = _zugferd_pdf_bytes()
 
-    with pikepdf.open(BytesIO(output_bytes)) as pdf:
-        with pdf.open_metadata() as metadata:
-            assert metadata["pdfaid:part"] == "3"
-            assert metadata["pdfaid:conformance"] == "B"
+    with pikepdf.open(BytesIO(output_bytes)) as pdf, pdf.open_metadata() as metadata:
+        assert metadata["pdfaid:part"] == "3"
+        assert metadata["pdfaid:conformance"] == "B"
 
 
 def test_output_pdf_contains_output_intent_with_valid_icc_profile():
