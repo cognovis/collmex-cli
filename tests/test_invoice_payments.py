@@ -131,6 +131,12 @@ class TestInvoicePaymentModel:
         assert payment.payment_date is None
         assert payment.payment_amount is None
 
+    def test_from_csv_row_system_name(self):
+        """A populated Systemname field is preserved from the CSV row."""
+        row = _make_payment_row(system_name="Kasse1")
+        payment = InvoicePayment.from_csv_row(row)
+        assert payment.system_name == "Kasse1"
+
     def test_from_csv_row_strips_invoice_number(self):
         """Leading/trailing whitespace in invoice_number is stripped."""
         row = _make_payment_row(invoice_number=" 10-04610-56733")

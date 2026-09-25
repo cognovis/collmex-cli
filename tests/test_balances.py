@@ -118,7 +118,7 @@ class TestAccbalGet:
 
     @patch("collmex_cli.client.CollmexAPI")
     def test_accbal_get_filters_non_acc_bal_rows(self, mock_api_cls):
-        """get_account_balances() ignores rows that are not ACC_BAL."""
+        """An unfiltered request has the API shape and ignores unrelated rows."""
         mock_api = mock_api_cls.return_value
         mock_api.config.company_id = 1
         mock_api.request.return_value = [
@@ -132,6 +132,7 @@ class TestAccbalGet:
 
         balances = client.get_account_balances()
 
+        assert mock_api.request.call_args.args[0] == ["ACCBAL_GET", "1", "", "", "", "", "", "", ""]
         assert len(balances) == 1
         assert balances[0].account_number == 1200
 
