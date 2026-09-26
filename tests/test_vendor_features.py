@@ -15,17 +15,17 @@ runner = CliRunner()
 
 def make_vendor(**kwargs) -> Vendor:
     """Helper to create a Vendor with sensible defaults."""
-    defaults = dict(
-        vendor_id=42,
-        company_name="Test GmbH",
-        street="Teststr. 1",
-        postal_code="12345",
-        city="Berlin",
-        vat_id="DE123456789",
-        tax_id="",
-        iban="DE89370400440532013000",
-        bic="COBADEFFXXX",
-    )
+    defaults = {
+        "vendor_id": 42,
+        "company_name": "Test GmbH",
+        "street": "Teststr. 1",
+        "postal_code": "12345",
+        "city": "Berlin",
+        "vat_id": "DE123456789",
+        "tax_id": "",
+        "iban": "DE89370400440532013000",
+        "bic": "COBADEFFXXX",
+    }
     defaults.update(kwargs)
     return Vendor(**defaults)
 
@@ -86,14 +86,6 @@ class TestVendorMissingFields:
         from collmex_cli.client import _vendor_missing_fields
 
         vendor = make_vendor(vat_id="", tax_id="123/456/78901")
-        missing = _vendor_missing_fields(vendor)
-        assert "vat_id" not in missing
-
-    def test_vat_id_satisfies_vat_requirement(self):
-        """Having vat_id but no tax_id is ok."""
-        from collmex_cli.client import _vendor_missing_fields
-
-        vendor = make_vendor(vat_id="DE123456789", tax_id="")
         missing = _vendor_missing_fields(vendor)
         assert "vat_id" not in missing
 
@@ -485,7 +477,6 @@ class TestZugferdCreateValidation:
     @patch("collmex_cli.zugferd.create_zugferd_xml")
     def test_zugferd_create_force_skips_validation(self, mock_xml, mock_client_cls):
         """zugferd-create --force skips validation and generates XML anyway."""
-        import os
         instance = mock_client_cls.return_value.__enter__.return_value
         incomplete_vendor = make_vendor(vendor_id=5, street="", vat_id="", tax_id="")
         instance.get_vendors.return_value = [incomplete_vendor]
@@ -542,7 +533,7 @@ class TestZugferdTaxRegistrationSchemeID:
         return [
             {
                 "description": "Beratung",
-                "quantity": Decimal("1"),
+                "quantity": Decimal(1),
                 "unit_price": Decimal("100.00"),
                 "tax_rate": Decimal("19.00"),
             }

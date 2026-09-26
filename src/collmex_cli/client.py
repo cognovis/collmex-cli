@@ -1,6 +1,7 @@
 """High-level Collmex client for common operations."""
 
 from datetime import date
+from typing import Self
 
 from .api import CollmexAPI, extract_new_object_id, find_new_object_id
 from .config import CollmexConfig
@@ -18,7 +19,7 @@ from .models import (
 )
 
 
-def _vendor_missing_fields(vendor: "Vendor") -> list[str]:
+def _vendor_missing_fields(vendor: Vendor) -> list[str]:
     """Return list of missing required vendor fields.
 
     Checks: street, postal_code, city, iban, and vat_id OR tax_id (at least one).
@@ -55,7 +56,7 @@ class CollmexClient:
         """Close the API connection."""
         self.api.close()
 
-    def __enter__(self) -> "CollmexClient":
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *args) -> None:
@@ -104,7 +105,7 @@ class CollmexClient:
         """
         return self.api.request(vendor.to_csv_row())
 
-    def update_vendor(self, vendor_id: int, **fields) -> "Vendor":
+    def update_vendor(self, vendor_id: int, **fields) -> Vendor:
         """Update an existing vendor's fields.
 
         Fetches the current vendor, applies the given field updates, and saves
@@ -421,7 +422,7 @@ class CollmexClient:
             Dict with last_date, booking_count, and account info
         """
         if fiscal_year is None:
-            fiscal_year = date.today().year
+            fiscal_year = date.today().year  # noqa: DTZ011 - fiscal years follow the local calendar.
 
         bookings = self.get_bookings(
             fiscal_year=fiscal_year,
@@ -620,9 +621,7 @@ class CollmexClient:
         unmatched = []
         for booking in bookings:
             # Bank transactions without vendor/customer assignment likely need matching
-            if booking.vendor_id is None and booking.customer_id is None:
-                # Also check if there's no invoice number
-                if not booking.invoice_number:
-                    unmatched.append(booking)
+            if booking.vendor_id is None and booking.customer_id is None and not booking.invoice_number:
+                unmatched.append(booking)
 
         return unmatched

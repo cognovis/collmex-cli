@@ -297,7 +297,7 @@ class Customer(CollmexRecord):
     invoice_format: int = Field(default=0, description="0=PDF+XML, 1=only XML, 2=only PDF (Rechnungsformat)")
 
     @classmethod
-    def from_csv_row(cls, row: list[str]) -> "Customer":
+    def from_csv_row(cls, row: list[str]) -> Customer:
         """Create Customer from CSV row (official CMXKND field order)."""
 
         def get(idx: int, default: str = "") -> str:
@@ -745,7 +745,7 @@ class AccountBalance(CollmexRecord):
     balance: Decimal | None = Field(default=None, description="Current balance (Saldo)")
 
     @classmethod
-    def from_csv_row(cls, row: list[str]) -> "AccountBalance":
+    def from_csv_row(cls, row: list[str]) -> AccountBalance:
         """Create AccountBalance from CSV row.
 
         Real format: ['ACC_BAL', account_number, account_name, balance]
@@ -819,7 +819,7 @@ class InvoicePayment(CollmexRecord):
         return None
 
     @classmethod
-    def from_csv_row(cls, row: list[str]) -> "InvoicePayment":
+    def from_csv_row(cls, row: list[str]) -> InvoicePayment:
         """Create InvoicePayment from CSV row.
 
         Field indices are 0-based (CSV row[0] = Satzart = field 1 in docs).
@@ -940,13 +940,13 @@ class Invoice(BaseModel):
     lines: list[InvoiceLine] = Field(default_factory=list, description="Invoice line items")
 
     @classmethod
-    def from_cmxinv_rows(cls, rows: list[list[str]]) -> list["Invoice"]:
+    def from_cmxinv_rows(cls, rows: list[list[str]]) -> list[Invoice]:
         """Parse a list of CMXINV rows into grouped Invoice objects.
 
         Rows with position=0 are header rows; rows with position>0 are line items.
         Invoices are grouped by invoice_id.
         """
-        invoices_map: dict[int, "Invoice"] = {}
+        invoices_map: dict[int, Invoice] = {}
 
         for row in rows:
             if not row or row[0] != "CMXINV":

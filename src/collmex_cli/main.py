@@ -1,7 +1,6 @@
 """Collmex CLI - LLM-friendly wrapper for Collmex accounting API."""
 
 import json
-import sys
 from datetime import date
 from decimal import Decimal
 from typing import Annotated
@@ -16,11 +15,8 @@ from .api import CollmexAuthError, CollmexError
 from .app_config import load_config
 from .client import CollmexClient
 from .models import (
-    AccountBalance,
     Customer,
     CustomerInvoice,
-    Invoice,
-    InvoicePayment,
     Vendor,
     VendorInvoice,
 )
@@ -48,8 +44,8 @@ def check_for_update() -> None:
                 f"[dim]Update available: {__version__} → {latest}  "
                 f"(uv tool upgrade collmex-cli)[/dim]"
             )
-    except Exception:
-        pass
+    except Exception:  # noqa: BLE001 - the optional update check must never block a command.
+        return
 
 app = typer.Typer(
     name="collmex",
@@ -124,7 +120,7 @@ def list_vendors(
             ]
             output_table("Vendors", ["ID", "Name", "City", "Email"], rows)
             console.print(f"\n[dim]Total: {len(vendors)} vendors[/dim]")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - CLI boundary converts failures to exit status 1.
         handle_error(e)
 
 
@@ -161,7 +157,7 @@ def create_vendor(
         else:
             console.print("[green]Vendor created successfully[/green]")
             console.print(f"Response: {result}")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - CLI boundary converts failures to exit status 1.
         handle_error(e)
 
 
@@ -194,7 +190,7 @@ def match_vendor(
         else:
             match_type = result.get("match")
             if match_type == "exact":
-                console.print(f"[green]Exact match found![/green]")
+                console.print("[green]Exact match found![/green]")
                 console.print(f"Match field: {result.get('match_field')}")
                 console.print(f"Vendor ID: {result.get('vendor_id')}")
                 vendor = result.get("vendor", {})
@@ -205,7 +201,7 @@ def match_vendor(
                     console.print(f"  [{c['score']}] ID {c['vendor_id']}: {c['name']}")
             else:
                 console.print("[red]No match found[/red]")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - CLI boundary converts failures to exit status 1.
         handle_error(e)
 
 
@@ -285,7 +281,7 @@ def update_vendor(
             console.print(f"Name: {updated.company_name}")
             console.print(f"Street: {updated.street}")
             console.print(f"City: {updated.city}")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - CLI boundary converts failures to exit status 1.
         handle_error(e)
 
 
@@ -314,7 +310,7 @@ def list_customers(
             ]
             output_table("Customers", ["ID", "Name", "City", "Email"], rows)
             console.print(f"\n[dim]Total: {len(customers)} customers[/dim]")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - CLI boundary converts failures to exit status 1.
         handle_error(e)
 
 
@@ -360,7 +356,7 @@ def create_customer(
         else:
             console.print(f"[green]Customer {action} successfully[/green]")
             console.print(f"Response: {result}")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - CLI boundary converts failures to exit status 1.
         handle_error(e)
 
 
@@ -408,7 +404,7 @@ def list_open_items(
             )
             total = sum(i.open_amount or Decimal(0) for i in items)
             console.print(f"\n[dim]Total: {len(items)} items, {total} EUR open[/dim]")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - CLI boundary converts failures to exit status 1.
         handle_error(e)
 
 
@@ -464,7 +460,7 @@ def list_bookings(
                 rows,
             )
             console.print(f"\n[dim]Total: {len(bookings)} bookings[/dim]")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - CLI boundary converts failures to exit status 1.
         handle_error(e)
 
 
@@ -514,7 +510,7 @@ def list_invoices(
                 rows,
             )
             console.print(f"\n[dim]Total: {len(invoices)} invoices[/dim]")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - CLI boundary converts failures to exit status 1.
         handle_error(e)
 
 
@@ -574,7 +570,7 @@ def list_balances(
                 rows,
             )
             console.print(f"\n[dim]Total: {len(balances)} accounts[/dim]")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - CLI boundary converts failures to exit status 1.
         handle_error(e)
 
 
@@ -624,7 +620,7 @@ def list_invoice_payments(
                 rows,
             )
             console.print(f"\n[dim]Total: {len(payments)} payments[/dim]")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - CLI boundary converts failures to exit status 1.
         handle_error(e)
 
 
@@ -652,8 +648,8 @@ def bank_status(
         elif cfg.bank_accounts:
             accounts = cfg.bank_accounts
         else:
-            err_console.print(f"[red]No bank accounts configured.[/red]")
-            err_console.print(f"Either use [bold]--account 1200[/bold] or configure accounts in:")
+            err_console.print("[red]No bank accounts configured.[/red]")
+            err_console.print("Either use [bold]--account 1200[/bold] or configure accounts in:")
             err_console.print(f"  [dim]{config_path()}[/dim]")
             err_console.print()
             err_console.print("[dim]Example config.toml:[/dim]")
@@ -689,7 +685,7 @@ def bank_status(
             if dates:
                 earliest = min(dates)
                 console.print(f"\n[dim]Export from MoneyMoney starting: {earliest}[/dim]")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - CLI boundary converts failures to exit status 1.
         handle_error(e)
 
 
@@ -738,7 +734,7 @@ def list_unmatched(
             )
             console.print(f"\n[dim]Total: {len(unmatched)} unmatched transactions[/dim]")
             console.print("[yellow]These entries need receipts/invoices to be matched.[/yellow]")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - CLI boundary converts failures to exit status 1.
         handle_error(e)
 
 
@@ -766,7 +762,7 @@ def create_customer_invoice(
         tax = (
             Decimal(str(tax_amount))
             if tax_amount is not None
-            else (net * Decimal(str(tax_rate)) / Decimal("100")).quantize(Decimal("0.01"))
+            else (net * Decimal(str(tax_rate)) / Decimal(100)).quantize(Decimal("0.01"))
         )
 
         invoice = CustomerInvoice(
@@ -798,7 +794,7 @@ def create_customer_invoice(
                 console.print(f"Buchungsnummer: {buchungsnummer}")
             console.print(f"Amount: {net} EUR (net)")
             console.print(f"Tax: {tax} EUR")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - CLI boundary converts failures to exit status 1.
         handle_error(e)
 
 
@@ -849,12 +845,12 @@ def create_vendor_invoice(
                 }
             )
         else:
-            console.print(f"[green]Vendor invoice created successfully[/green]")
+            console.print("[green]Vendor invoice created successfully[/green]")
             console.print(f"Vendor: {vendor_id}")
             console.print(f"Invoice: {invoice_number}")
             console.print(f"Buchungsnummer: {buchungsnummer}")
             console.print(f"Amount: {net_amount} EUR (net)")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - CLI boundary converts failures to exit status 1.
         handle_error(e)
 
 
@@ -902,7 +898,7 @@ def send_invoice(
             body=body,
         )
 
-        console.print(f"[green]Invoice sent successfully![/green]")
+        console.print("[green]Invoice sent successfully![/green]")
         if recipient:
             console.print(f"Recipient: {recipient}")
         else:
@@ -911,7 +907,7 @@ def send_invoice(
         if xml:
             console.print(f"XML: {xml}")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - CLI boundary converts failures to exit status 1.
         handle_error(e)
 
 
@@ -992,7 +988,7 @@ def create_zugferd(
         else:
             print(xml_content.decode("utf-8") if isinstance(xml_content, bytes) else xml_content)
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - CLI boundary converts failures to exit status 1.
         handle_error(e)
 
 
@@ -1092,7 +1088,7 @@ def create_customer_zugferd(
         console.print(f"[green]ZUGFeRD XML saved to {xml_output_path}[/green]")
     except typer.Exit:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - CLI boundary converts failures to exit status 1.
         handle_error(e)
 
 
@@ -1108,7 +1104,7 @@ def _parse_customer_zugferd_items(items_json: str) -> list[dict[str, Decimal | s
     line_items: list[dict[str, Decimal | str]] = []
     for index, raw in enumerate(raw_items, start=1):
         if not isinstance(raw, dict):
-            raise ValueError(f"Line item {index} must be an object")
+            raise ValueError(f"Line item {index} must be an object")  # noqa: TRY004 - keep CLI error wording.
 
         description = raw.get("description") or raw.get("desc")
         if not description:
@@ -1188,127 +1184,7 @@ def upload_statement(
             console.print(f"Account: {result['account']}")
     except (PlaywrightCliError, CollmexWebError) as e:
         handle_error(e)
-    except Exception as e:
-        handle_error(e)
-
-
-@app.command("import-statements")
-def import_statements(
-    account: Annotated[str | None, typer.Option("--account", "-a", help="Single account name from config (default: all)")] = None,
-    date_from: Annotated[str | None, typer.Option("--from", help="Export start date (YYYY-MM-DD, default: last booking date)")] = None,
-    all_accounts: Annotated[bool, typer.Option("--all", help="Process all configured MoneyMoney accounts")] = False,
-    json_output: Annotated[bool, typer.Option("--json", "-j", help="Output as JSON")] = False,
-) -> None:
-    """Import bank statements from MoneyMoney into Collmex.
-
-    Full roundtrip:
-    1. Get last import date from Collmex (bank-status)
-    2. Export from MoneyMoney via `mm export` (sta format)
-    3. Upload each .sta file to Collmex web UI
-
-    Requires MoneyMoney to be running and unlocked.
-    Requires playwright-cli with a saved Collmex session.
-    """
-    import subprocess
-    import tempfile
-    from pathlib import Path
-
-    from .web import CollmexWeb, CollmexWebError, PlaywrightCliError
-
-    try:
-        cfg = load_config()
-
-        if not cfg.mm_accounts:
-            err_console.print("[red]No MoneyMoney accounts configured.[/red]")
-            err_console.print("Add [mm_accounts] section to config.toml:")
-            err_console.print('[dim]"Fyrst Base" = "Fyrst (1200)"[/dim]')
-            raise typer.Exit(1)
-
-        # Determine which accounts to process
-        if account:
-            # Find MM account(s) mapping to this config account
-            mm_pairs = [(mm, cfg_name) for mm, cfg_name in cfg.mm_accounts.items() if cfg_name == account]
-            if not mm_pairs:
-                # Maybe user passed the MM name directly
-                if account in cfg.mm_accounts:
-                    mm_pairs = [(account, cfg.mm_accounts[account])]
-                else:
-                    err_console.print(f"[red]Account '{account}' not found in mm_accounts config.[/red]")
-                    raise typer.Exit(1)
-        else:
-            mm_pairs = list(cfg.mm_accounts.items())
-
-        # Get last booking dates for start date determination
-        last_dates: dict[str, date | None] = {}
-        if not date_from:
-            with CollmexClient() as client:
-                for _mm_name, cfg_name in mm_pairs:
-                    acct_nr = cfg.bank_accounts.get(cfg_name)
-                    if acct_nr:
-                        result = client.get_last_bank_booking_date(bank_account=acct_nr)
-                        last_dates[cfg_name] = result.get("last_date")
-
-        results = []
-        web = CollmexWeb(app_config=cfg)
-        try:
-            for mm_name, cfg_name in mm_pairs:
-                console.print(f"\n[bold]{cfg_name}[/bold] (MoneyMoney: {mm_name})")
-
-                # Determine export start date
-                if date_from:
-                    start = date_from
-                elif last_dates.get(cfg_name):
-                    start = str(last_dates[cfg_name])
-                else:
-                    err_console.print(f"  [yellow]No last booking date found, skipping.[/yellow]")
-                    err_console.print("  Use --from DATE to specify a start date.")
-                    continue
-
-                console.print(f"  Exporting from {start}...")
-
-                # Export from MoneyMoney via mm CLI
-                with tempfile.NamedTemporaryFile(suffix=".sta", delete=False) as tmp:
-                    tmp_path = Path(tmp.name)
-
-                try:
-                    mm_result = subprocess.run(
-                        ["mm", "export", "-a", mm_name, "--from", start, "--format", "sta", "-o", str(tmp_path)],
-                        capture_output=True,
-                        text=True,
-                        timeout=30,
-                    )
-                    if mm_result.returncode != 0:
-                        err_console.print(f"  [red]mm export failed:[/red] {mm_result.stderr.strip()}")
-                        continue
-
-                    # Check if file has content
-                    if not tmp_path.exists() or tmp_path.stat().st_size == 0:
-                        console.print("  [dim]No new transactions to export.[/dim]")
-                        continue
-
-                    console.print(f"  Uploading {tmp_path.name} ({tmp_path.stat().st_size} bytes)...")
-
-                    # Upload to Collmex
-                    upload_result = web.upload_statement(tmp_path, cfg_name)
-                    console.print(f"  [green]{upload_result['message']}[/green]")
-                    results.append(upload_result)
-
-                finally:
-                    tmp_path.unlink(missing_ok=True)
-
-        finally:
-            web.close()
-
-        if json_output:
-            output_json(results)
-        elif not results:
-            console.print("\n[dim]No statements were imported.[/dim]")
-        else:
-            console.print(f"\n[green]Done: {len(results)} account(s) imported.[/green]")
-
-    except (PlaywrightCliError, CollmexWebError) as e:
-        handle_error(e)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - CLI boundary converts failures to exit status 1.
         handle_error(e)
 
 
@@ -1415,6 +1291,7 @@ def import_statements(
                         capture_output=True,
                         text=True,
                         timeout=30,
+                        check=False,
                     )
                     if mm_result.returncode != 0:
                         err_console.print(
@@ -1451,7 +1328,7 @@ def import_statements(
 
     except (PlaywrightCliError, CollmexWebError) as e:
         handle_error(e)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - CLI boundary converts failures to exit status 1.
         handle_error(e)
 
 
@@ -1496,7 +1373,7 @@ def pending_bookings(
             console.print(f"\n[dim]Total: {len(bookings)} pending bookings[/dim]")
     except (PlaywrightCliError, CollmexWebError) as e:
         handle_error(e)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - CLI boundary converts failures to exit status 1.
         handle_error(e)
 
 
@@ -1585,7 +1462,7 @@ def bank_statements(
 
     except (PlaywrightCliError, CollmexWebError) as e:
         handle_error(e)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - CLI boundary converts failures to exit status 1.
         handle_error(e)
 
 
@@ -1603,7 +1480,7 @@ def test_connection() -> None:
             vendors = client.get_vendors()
         console.print("[green]Connection successful![/green]")
         console.print(f"Found {len(vendors)} vendors in your account.")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - CLI boundary converts failures to exit status 1.
         handle_error(e)
 
 

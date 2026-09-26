@@ -1,8 +1,8 @@
 """Tests for customer-invoice command (CMXUMS / collmex-cli-rg8)."""
 
+import json
 from datetime import date
 from decimal import Decimal
-import json
 from unittest.mock import patch
 
 import pytest

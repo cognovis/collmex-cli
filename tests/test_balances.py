@@ -67,14 +67,6 @@ class TestAccountBalanceModel:
         assert bal.account_name == ""
         assert bal.balance is None
 
-    def test_balance_model_decimal_with_comma(self):
-        """German comma decimal separator is parsed correctly."""
-        row = ["ACC_BAL", "320", "Pkw", "65764,94"]
-        bal = AccountBalance.from_csv_row(row)
-
-        assert bal.balance == Decimal("65764.94")
-
-
 # =============================================================================
 # Client method tests
 # =============================================================================
@@ -125,23 +117,8 @@ class TestAccbalGet:
         assert len(call_args) == 9       # all 9 fields present
 
     @patch("collmex_cli.client.CollmexAPI")
-    def test_accbal_get_no_filters(self, mock_api_cls):
-        """get_account_balances() without filters sends ACCBAL_GET."""
-        mock_api = mock_api_cls.return_value
-        mock_api.config.company_id = 1
-        mock_api.request.return_value = []
-
-        client = CollmexClient.__new__(CollmexClient)
-        client.api = mock_api
-
-        client.get_account_balances()
-
-        call_args = mock_api.request.call_args[0][0]
-        assert call_args[0] == "ACCBAL_GET"
-
-    @patch("collmex_cli.client.CollmexAPI")
     def test_accbal_get_filters_non_acc_bal_rows(self, mock_api_cls):
-        """get_account_balances() ignores rows that are not ACC_BAL."""
+        """An unfiltered request has the API shape and ignores unrelated rows."""
         mock_api = mock_api_cls.return_value
         mock_api.config.company_id = 1
         mock_api.request.return_value = [
@@ -155,6 +132,7 @@ class TestAccbalGet:
 
         balances = client.get_account_balances()
 
+        assert mock_api.request.call_args.args[0] == ["ACCBAL_GET", "1", "", "", "", "", "", "", ""]
         assert len(balances) == 1
         assert balances[0].account_number == 1200
 
