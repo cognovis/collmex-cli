@@ -69,3 +69,8 @@ Thumbs.db
 .worktree-handoff.json
 .claude/worktrees/
 
+
+# Beads runtime locks and local credential (machine-specific)
+/.beads.gate.lock
+/.beads/*.gate.lock
+/.beads/.beads-credential-key
