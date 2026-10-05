@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import logging
 from io import BytesIO
 from pathlib import Path
 from typing import get_type_hints
@@ -17,6 +18,7 @@ from reportlab.pdfgen import canvas
 from starlette.middleware.base import RequestResponseEndpoint
 from starlette.responses import Response
 
+from collmex_cli import zugferd
 from collmex_cli.invoice_snapshot import InvoiceSnapshot, InvoiceSnapshotError, validate_invoice_snapshot
 from collmex_cli.zugferd import generate_invoice_documents
 from collmex_cli.zugferd_service import app, authenticate_document_requests
@@ -277,6 +279,16 @@ def test_zero_rate_tax_categories_keep_their_en16931_semantics(category_code: st
     assert xml_check_schematron(documents.xml, flavor="factur-x", level="en16931") is True
 
 
+def test_reverse_charge_without_buyer_vat_id_fails_the_en16931_rules() -> None:
+    """BR-AE-02 requires a buyer VAT identifier on reverse-charge invoices; the Schematron check rejects it."""
+    payload = _zero_rate_snapshot("AE")
+    payload["buyer"]["vat_id"] = None
+    snapshot = InvoiceSnapshot.model_validate(payload)
+
+    with pytest.raises(ValueError, match=r"^Invoice 84001 has invalid fields: en16931_rules$"):
+        generate_invoice_documents(snapshot, _visible_pdf())
+
+
 def test_tax_breakdown_rounds_the_aggregate_basis() -> None:
     """Two three-cent lines produce one cent VAT, matching the visible fixed-rate invoice."""
     documents = generate_invoice_documents(
@@ -486,6 +498,51 @@ def test_service_redacts_generator_failures(
     assert response.status_code == 422
     assert "document_generation" in response.text
     assert "Sensitive" not in response.text
+
+
+def test_service_reports_missing_en16931_validator_as_unavailable(
+    configured_service: tuple[TestClient, dict[str, str]],
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Without a Schematron stylesheet the service fails with 503 and blames no invoice field."""
+    client, headers = configured_service
+    monkeypatch.setattr(zugferd, "EN16931_STYLESHEET_NAMES", ("Absent_EN16931.xslt",))
+    with caplog.at_level(logging.ERROR, logger="collmex_cli.zugferd_service"):
+        response = client.post(
+            "/v1/zugferd/documents",
+            headers=headers,
+            json={
+                "snapshot": _snapshot(),
+                "visible_pdf_base64": base64.b64encode(_visible_pdf()).decode("ascii"),
+            },
+        )
+
+    assert response.status_code == 503
+    assert response.json() == {"detail": "EN 16931 validator is unavailable"}
+    assert "pdf_base64" not in response.text
+    error_messages = [record.getMessage() for record in caplog.records if record.levelno == logging.ERROR]
+    assert any("Absent_EN16931.xslt" in message for message in error_messages)
+
+
+def test_service_rejects_an_invoice_that_fails_the_en16931_rules(
+    configured_service: tuple[TestClient, dict[str, str]],
+) -> None:
+    """An invoice the Schematron rejects stays a 422 invoice error, not a service outage."""
+    client, headers = configured_service
+    payload = _zero_rate_snapshot("AE")
+    payload["buyer"]["vat_id"] = None
+    response = client.post(
+        "/v1/zugferd/documents",
+        headers=headers,
+        json={
+            "snapshot": payload,
+            "visible_pdf_base64": base64.b64encode(_visible_pdf()).decode("ascii"),
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {"detail": "Invoice 84001 has invalid fields: document_generation"}
 
 
 def test_service_redacts_invalid_object_identifier(

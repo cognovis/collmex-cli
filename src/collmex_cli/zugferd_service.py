@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import logging
 import os
 import secrets
 from pathlib import Path
@@ -16,7 +17,9 @@ from starlette.middleware.base import RequestResponseEndpoint
 from starlette.responses import Response
 
 from .invoice_snapshot import InvoiceSnapshot, InvoiceSnapshotError
-from .zugferd import generate_invoice_documents
+from .zugferd import EN16931ValidatorMissingError, generate_invoice_documents
+
+logger = logging.getLogger(__name__)
 
 
 class DocumentRequest(BaseModel):
@@ -122,6 +125,13 @@ def create_documents(request: DocumentRequest) -> DocumentResponse | JSONRespons
 
     try:
         documents = generate_invoice_documents(request.snapshot, visible_pdf)
+    except EN16931ValidatorMissingError as exc:
+        # The service cannot validate any invoice; this is not a fault of the submitted invoice.
+        logger.error(
+            "EN 16931 Schematron validator is not installed; expected one of: %s",
+            ", ".join(str(path) for path in exc.expected_paths),
+        )
+        return JSONResponse(status_code=503, content={"detail": "EN 16931 validator is unavailable"})
     except Exception:  # noqa: BLE001 -- sanitize every generator failure at this transport boundary.
         return JSONResponse(
             status_code=422,

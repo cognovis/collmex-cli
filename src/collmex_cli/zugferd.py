@@ -50,6 +50,15 @@ class GeneratedInvoiceDocuments:
     xml: bytes
 
 
+class EN16931ValidatorMissingError(RuntimeError):
+    """The EN 16931 Schematron stylesheet is not installed, so no invoice can be validated."""
+
+    def __init__(self, expected_paths: list[Path]) -> None:
+        self.expected_paths = expected_paths
+        listed = ", ".join(str(path) for path in expected_paths)
+        super().__init__(f"EN 16931 Schematron validator is not installed; expected one of: {listed}")
+
+
 def generate_invoice_documents(snapshot: InvoiceSnapshot, visible_pdf: bytes) -> GeneratedInvoiceDocuments:
     """Generate and validate one coherent ZUGFeRD document pair.
 
@@ -193,16 +202,43 @@ def _validate_pdfa3b(object_id: int, pdf_content: bytes) -> None:
         raise ValueError(f"Invoice {object_id} has invalid fields: pdfa3b") from exc
 
 
+# Compiled EN 16931 Schematron file names in the factur-x package, newest layout first.
+# factur-x 7 ships FACTUR-X_EN16931.xslt; earlier releases ship Factur-X_1.09_EN16931.xsl.
+EN16931_STYLESHEET_NAMES = ("FACTUR-X_EN16931.xslt", "Factur-X_1.09_EN16931.xsl")
+
+
+def find_en16931_stylesheet(schematron_dir: Path | None = None) -> Path:
+    """Return the compiled EN 16931 Schematron stylesheet.
+
+    Args:
+        schematron_dir: Directory that holds the stylesheet. Defaults to the
+            ``xsd_and_schematron/facturx-en16931`` directory of the installed
+            factur-x package.
+
+    Returns:
+        Path of the first known stylesheet file name that exists.
+
+    Raises:
+        EN16931ValidatorMissingError: No known stylesheet file exists.
+    """
+    if schematron_dir is None:
+        import importlib.resources
+
+        schematron_dir = Path(str(importlib.resources.files("facturx").joinpath("xsd_and_schematron/facturx-en16931")))
+    candidates = [schematron_dir / name for name in EN16931_STYLESHEET_NAMES]
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    raise EN16931ValidatorMissingError(candidates)
+
+
 def _validate_en16931_schematron(object_id: int, xml_content: bytes) -> None:
     """Run the bundled EN 16931 Schematron locally with SaxonC."""
-    import importlib.resources
     import xml.etree.ElementTree as ET
 
     from saxonche import PySaxonApiError, PySaxonProcessor
 
-    stylesheet = importlib.resources.files("facturx").joinpath(
-        "xsd_and_schematron/facturx-en16931/Factur-X_1.09_EN16931.xsl"
-    )
+    stylesheet = find_en16931_stylesheet()
     try:
         with PySaxonProcessor(license=False) as processor:
             executable = processor.new_xslt30_processor().compile_stylesheet(stylesheet_file=str(stylesheet))

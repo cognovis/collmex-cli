@@ -27,7 +27,7 @@ jobs:
           enable-cache: true
 
       - name: Run test suite
-        run: uv run pytest
+        run: uv run --locked pytest
 
       - name: Build package
         run: uv build
