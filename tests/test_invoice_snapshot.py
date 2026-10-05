@@ -277,6 +277,16 @@ def test_zero_rate_tax_categories_keep_their_en16931_semantics(category_code: st
     assert xml_check_schematron(documents.xml, flavor="factur-x", level="en16931") is True
 
 
+def test_reverse_charge_without_buyer_vat_id_fails_the_en16931_rules() -> None:
+    """BR-AE-02 requires a buyer VAT identifier on reverse-charge invoices; the Schematron check rejects it."""
+    payload = _zero_rate_snapshot("AE")
+    payload["buyer"]["vat_id"] = None
+    snapshot = InvoiceSnapshot.model_validate(payload)
+
+    with pytest.raises(ValueError, match=r"^Invoice 84001 has invalid fields: en16931_rules$"):
+        generate_invoice_documents(snapshot, _visible_pdf())
+
+
 def test_tax_breakdown_rounds_the_aggregate_basis() -> None:
     """Two three-cent lines produce one cent VAT, matching the visible fixed-rate invoice."""
     documents = generate_invoice_documents(
