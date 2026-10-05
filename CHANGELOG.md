@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [2026.10.0] - 2026-10-05
+
 ### Fixed
 
 - **ZUGFeRD invoice validation works with factur-x 7**: factur-x 7.1 renamed the bundled EN 16931 Schematron to `FACTUR-X_EN16931.xslt`, so every invoice failed with `invalid fields: en16931_rules`. The check now uses the factur-x 7 file and falls back to the earlier `Factur-X_1.09_EN16931.xsl`. If neither file is installed, generation fails with an error that names the expected paths and does not report the invoice as invalid. The Schematron rules are unchanged. (cognovis/collmex-cli#11)
