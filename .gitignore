@@ -51,25 +51,12 @@ Thumbs.db
 # Playwright CLI
 .playwright-cli/
 
-# Dolt database files (added by bd init)
 .dolt/
 *.db
 
-# Beads JSONL export is local; Dolt is the source of truth.
-.beads/issues.jsonl
 
-# Beads runtime artifacts
-.beads/export-state.json
-.beads/backup/
-.beads/runs/
 
 # Session-close runtime artifacts
 .session-close.lock
 .worktree-handoff.json
 .claude/worktrees/
-
-
-# Beads runtime locks and local credential (machine-specific)
-/.beads.gate.lock
-/.beads/*.gate.lock
-/.beads/.beads-credential-key
