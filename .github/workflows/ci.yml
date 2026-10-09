@@ -24,6 +24,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v6
         with:
+          version: latest
           enable-cache: true
 
       - name: Run test suite
@@ -31,3 +32,13 @@ jobs:
 
       - name: Build package
         run: uv build
+
+  toolchains:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check toolchain versions
+        run: python3 .agents/standards/toolchains/scripts/check_toolchain_versions.py

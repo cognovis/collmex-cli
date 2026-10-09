@@ -16,6 +16,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
         with:
+          version: latest
           enable-cache: true
       - run: uv sync --locked --dev
       - run: uv run --locked pytest
@@ -27,6 +28,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
         with:
+          version: latest
           enable-cache: true
 
       - name: Stamp version from tag
