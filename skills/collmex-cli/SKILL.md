@@ -74,7 +74,7 @@ collmex vendor-invoice --vendor-id <id> --invoice "<invoice-number>" \
 `vendor-invoice` books an expense. Its default account is 3200 and omitted tax
 is auto-calculated; verify both rather than relying on them. Optional
 `--cost-center` uses the intended configured center. Read back the booking and
-compare its currency, net amount, tax amount and expense account against the
+compare its net amount, tax amount and expense account against the
 verified EUR amounts and accounting treatment before reporting success and its
 identifier. Retrying a write needs evidence that the first attempt did not already
 succeed; do not create a second posting after an ambiguous response.
