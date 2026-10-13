@@ -41,8 +41,8 @@ connection and can contact the live accounting system.
 ## Prepare vendor and invoice
 
 Before any write, verify the existing vendor, invoice number, fiscal year,
-amounts, tax treatment, expense account and cost center. Search existing bookings
-for duplicates; a failed query does not prove absence. Do not post into a closed
+invoice currency, amounts, tax treatment, expense account and cost center.
+Search existing bookings for duplicates; a failed query does not prove absence. Do not post into a closed
 fiscal year or infer an accounting treatment from a generic example.
 
 Vendor creation uses `vendor-create --company` with optional `--street`,
@@ -50,6 +50,13 @@ Vendor creation uses `vendor-create --company` with optional `--street`,
 Update uses `vendor-update --vendor-id` and `--name`/`--postal-code`
 rather than creation's `--company`/`--zip`. Verify the created/updated
 record before referring to its ID.
+
+`vendor-invoice` and `zugferd-create` use EUR and expose no currency option.
+For a foreign-currency invoice, establish the EUR amounts from the bank statement
+or an accounting-approved, documented exchange-rate source. Verify the applicable
+date/rate and EUR net/tax amounts; do not infer their split from foreign totals.
+If those amounts or the conversion basis are unresolved, stop for an accounting
+decision. Never pass foreign-currency figures as EUR amounts.
 
 `vendor-invoice --net` fills the full-VAT-rate fields only. The current CLI
 treats `--tax 0` as omitted and lets Collmex auto-calculate full-rate VAT.
@@ -67,14 +74,16 @@ collmex vendor-invoice --vendor-id <id> --invoice "<invoice-number>" \
 `vendor-invoice` books an expense. Its default account is 3200 and omitted tax
 is auto-calculated; verify both rather than relying on them. Optional
 `--cost-center` uses the intended configured center. Read back the booking and
-compare its net amount, tax amount and expense account against the invoice's
-verified amounts and accounting treatment before reporting success and its
+compare its currency, net amount, tax amount and expense account against the
+verified EUR amounts and accounting treatment before reporting success and its
 identifier. Retrying a write needs evidence that the first attempt did not already
 succeed; do not create a second posting after an ambiguous response.
 
 ## ZUGFeRD document and delivery
 
-For a requested vendor document:
+For a requested vendor document, use verified EUR amounts and check that the
+document is meant to be EUR-denominated. If it must retain a foreign currency,
+stop for an accounting decision; this command cannot preserve that currency.
 
 ```bash
 collmex zugferd-create --vendor-id <id> --invoice "<invoice-number>" \
