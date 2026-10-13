@@ -51,7 +51,12 @@ Update uses `vendor-update --vendor-id` and `--name`/`--postal-code`
 rather than creation's `--company`/`--zip`. Verify the created/updated
 record before referring to its ID.
 
-For an authorized posting, call the native command directly:
+`vendor-invoice --net` fills the full-VAT-rate fields only. The current CLI
+treats `--tax 0` as omitted and lets Collmex auto-calculate full-rate VAT.
+For zero-rate, reduced-rate or reverse-charge invoices, stop for an accounting
+decision and never use the full-rate posting example below.
+
+For an authorized full-rate VAT posting, call the native command directly:
 
 ```bash
 collmex vendor-invoice --vendor-id <id> --invoice "<invoice-number>" \
@@ -62,8 +67,10 @@ collmex vendor-invoice --vendor-id <id> --invoice "<invoice-number>" \
 `vendor-invoice` books an expense. Its default account is 3200 and omitted tax
 is auto-calculated; verify both rather than relying on them. Optional
 `--cost-center` uses the intended configured center. Read back the booking and
-report its identifier. Retrying a write needs evidence that the first attempt did
-not already succeed; do not create a second posting after an ambiguous response.
+compare its net amount, tax amount and expense account against the invoice's
+verified amounts and accounting treatment before reporting success and its
+identifier. Retrying a write needs evidence that the first attempt did not already
+succeed; do not create a second posting after an ambiguous response.
 
 ## ZUGFeRD document and delivery
 
