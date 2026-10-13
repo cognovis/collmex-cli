@@ -15,11 +15,11 @@ authorization remains governed by the active policy.
 ## Install and sync
 
 Register this published source in the consumer's active catalog, then select it
-from the consumer repository:
+from the consumer repository, replacing `<harness>` with its selected harness:
 
 ```bash
-library skill use collmex-cli --harness codex
-library sync --harness codex
+library skill use collmex-cli --harness <harness>
+library sync --harness <harness>
 ```
 
 An explicit catalog file can be supplied with `library --catalog <file>`.

@@ -14,8 +14,8 @@ installed version.
 
 Configuration comes from `COLLMEX_*` environment, the XDG
 `~/.config/collmex-cli/config.toml` credentials section, then the current
-directory's `.env`. Use configured credentials without printing them; render
-missing files from their tracked templates. Relevant groups include API
+directory's `.env`. Apply the active shared instructions' credential handling.
+Relevant groups include API
 customer/company/user/password, optional SMTP/accounting recipient and buyer
 details. Never put values in source or tool output.
 
@@ -84,11 +84,9 @@ seller information using the owning document-validation workflow. Do not use
 Review attachments and the exact recipient first; a default
 `COLLMEX_ACCOUNTING_EMAIL` is configuration, not permission to send.
 
-Accounting/billing changes fall under the active production approval boundary.
-Customer or partner messages require explicit authorization for the content and
-recipient. Prepare and verify the concrete result before asking when approval is
-needed. Pure reads and local preparation do not introduce an approval gate.
-The skill grants no permission to post, pay or send merely because it was loaded.
+Apply the active shared instructions' authorization rules to accounting writes
+and customer or partner delivery. Loading this skill does not authorize a
+posting, payment or send.
 
 The former vendor and ZUGFeRD example scripts are dissolved into these native
 command instructions; no skill-local executable wrapper is required.
