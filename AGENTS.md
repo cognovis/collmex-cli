@@ -2,6 +2,13 @@
 
 Use hosted issues through `ccore tracker`. Refer to issues as `owner/repo#N`.
 
+## Tool usage content
+
+The `collmex-cli` usage skill is authored in `skills/collmex-cli/` and declared
+in this repository's source catalog. Read [Library content](docs/library-content.md)
+for provenance and the Library install/sync route. Installed copies are managed
+by Library; executable accounting behavior stays in `src/collmex_cli/`.
+
 ## Skill Dependencies
 
 ### customer-invoice (sussdorff-core)

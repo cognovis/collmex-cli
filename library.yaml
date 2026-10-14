@@ -1,0 +1,24 @@
+catalog_identity: https://github.com/cognovis/collmex-cli
+catalogs:
+- name: cognovis-collmex-cli
+  source: https://github.com/cognovis/collmex-cli
+  content_types:
+  - skills
+library:
+  skills:
+  - name: collmex-cli
+    description: Query Collmex vendors, open items and bookings, or prepare a requested vendor
+      invoice and ZUGFeRD document using the collmex CLI.
+    source: https://github.com/cognovis/collmex-cli/blob/main/skills/collmex-cli/SKILL.md
+    metadata:
+      library:
+        source_catalog: cognovis-collmex-cli
+        inventory: manual
+        plane: dev
+      provenance:
+        repository: cognovis/library-core
+        commit: 7c1f546b17a36032977c3a42c272f21c783f32f5
+        path: skills/collmex-cli/SKILL.md
+    tags:
+    - tier:domain
+    tracking: committed
