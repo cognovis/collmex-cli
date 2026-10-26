@@ -62,10 +62,6 @@ class CollmexClient:
     def __exit__(self, *args) -> None:
         self.close()
 
-    # =========================================================================
-    # Vendors (Lieferanten)
-    # =========================================================================
-
     def get_vendors(
         self,
         vendor_id: int | None = None,
@@ -158,7 +154,6 @@ class CollmexClient:
         """
         vendors = self.get_vendors()
 
-        # 1. Try IBAN match (exact)
         if iban:
             iban_clean = iban.replace(" ", "").upper()
             for v in vendors:
@@ -171,7 +166,6 @@ class CollmexClient:
                         "missing_fields": _vendor_missing_fields(v),
                     }
 
-        # 2. Try VAT ID match (exact)
         if vat_id:
             vat_clean = vat_id.replace(" ", "").upper()
             for v in vendors:
@@ -184,7 +178,6 @@ class CollmexClient:
                         "missing_fields": _vendor_missing_fields(v),
                     }
 
-        # 3. Try name match (fuzzy)
         if name:
             name_lower = name.lower()
             candidates = []
@@ -194,7 +187,6 @@ class CollmexClient:
                     continue
                 vendor_name_lower = vendor_name.lower()
 
-                # Calculate simple similarity score
                 score = self._fuzzy_score(name_lower, vendor_name_lower)
                 if score > 0.4:  # Threshold for consideration
                     candidates.append({
@@ -206,7 +198,6 @@ class CollmexClient:
                     })
 
             if candidates:
-                # Sort by score descending
                 candidates.sort(key=lambda x: x["score"], reverse=True)
                 # If top match is very good, return as exact
                 if candidates[0]["score"] > 0.9:
@@ -242,10 +233,6 @@ class CollmexClient:
         intersection = tokens1 & tokens2
         union = tokens1 | tokens2
         return len(intersection) / len(union)
-
-    # =========================================================================
-    # Customers (Kunden)
-    # =========================================================================
 
     def get_customers(
         self,
@@ -286,10 +273,6 @@ class CollmexClient:
         """
         return self.api.request(customer.to_csv_row())
 
-    # =========================================================================
-    # Vendor Invoices (Lieferantenrechnungen)
-    # =========================================================================
-
     def create_vendor_invoice(self, invoice: VendorInvoice) -> int:
         """Create a vendor invoice (books expense in accounting).
 
@@ -302,10 +285,6 @@ class CollmexClient:
         rows = self.api.request(invoice.to_csv_row())
         return extract_new_object_id(rows)
 
-    # =========================================================================
-    # Customer Invoices
-    # =========================================================================
-
     def create_customer_invoice(self, invoice: CustomerInvoice) -> int | None:
         """Create a customer invoice (books revenue in accounting).
 
@@ -315,10 +294,6 @@ class CollmexClient:
         """
         rows = self.api.request(invoice.to_csv_row())
         return find_new_object_id(rows)
-
-    # =========================================================================
-    # Open Items (Offene Posten)
-    # =========================================================================
 
     def get_open_items(
         self,
@@ -348,10 +323,6 @@ class CollmexClient:
 
         results = self.api.request(row)
         return [OpenItem.from_csv_row(r) for r in results if r and r[0] == "OPEN_ITEM"]
-
-    # =========================================================================
-    # Accounting Documents (Buchungen)
-    # =========================================================================
 
     def get_bookings(
         self,
@@ -437,7 +408,6 @@ class CollmexClient:
                 "booking_count": 0,
             }
 
-        # Find the latest document_date
         dates = [b.document_date for b in bookings if b.document_date]
         last_date = max(dates) if dates else None
 
@@ -447,10 +417,6 @@ class CollmexClient:
             "last_date": last_date,
             "booking_count": len(bookings),
         }
-
-    # =========================================================================
-    # Customer Invoices (Kundenrechnungen)
-    # =========================================================================
 
     def get_invoices(
         self,
@@ -487,10 +453,6 @@ class CollmexClient:
         results = self.api.request(row)
         cmxinv_rows = [r for r in results if r and r[0] == "CMXINV"]
         return Invoice.from_cmxinv_rows(cmxinv_rows)
-
-    # =========================================================================
-    # Account Balances (Kontosalden)
-    # =========================================================================
 
     def get_account_balances(
         self,
@@ -545,10 +507,6 @@ class CollmexClient:
 
         results = self.api.request(row)
         return [AccountBalance.from_csv_row(r) for r in results if r and r[0] == "ACC_BAL"]
-
-    # =========================================================================
-    # Invoice Payments (Rechnungszahlungen)
-    # =========================================================================
 
     def get_invoice_payments(
         self,
@@ -608,7 +566,6 @@ class CollmexClient:
         Returns:
             List of unmatched bank transactions
         """
-        # Get all bank account bookings
         bookings = self.get_bookings(
             fiscal_year=fiscal_year,
             account_number=bank_account,

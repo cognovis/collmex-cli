@@ -95,11 +95,6 @@ class CollmexRecord(BaseModel):
         raise NotImplementedError
 
 
-# =============================================================================
-# Vendor (Lieferant) - CMXLIF
-# =============================================================================
-
-
 class Vendor(CollmexRecord):
     """Collmex vendor/supplier record (CMXLIF).
 
@@ -217,11 +212,6 @@ class Vendor(CollmexRecord):
             self.delivery_terms_extra,
             str(self.output_medium),
         ]
-
-
-# =============================================================================
-# Customer (Kunde) - CMXKND
-# =============================================================================
 
 
 class Customer(CollmexRecord):
@@ -422,11 +412,6 @@ class Customer(CollmexRecord):
         ]
 
 
-# =============================================================================
-# Vendor Invoice (Lieferantenrechnung) - CMXLRN
-# =============================================================================
-
-
 class VendorInvoice(CollmexRecord):
     """Collmex vendor invoice record (CMXLRN).
 
@@ -493,11 +478,6 @@ class VendorInvoice(CollmexRecord):
         ]
 
 
-# =============================================================================
-# Customer Invoice - CMXUMS
-# =============================================================================
-
-
 class CustomerInvoice(CollmexRecord):
     """Collmex customer invoice record (CMXUMS).
 
@@ -552,11 +532,6 @@ class CustomerInvoice(CollmexRecord):
             self.payment_terms,
             str(self.account_full_tax) if self.account_full_tax is not None else "",
         ]
-
-
-# =============================================================================
-# Open Item (Offener Posten) - OPEN_ITEM
-# =============================================================================
 
 
 class OpenItem(CollmexRecord):
@@ -629,11 +604,6 @@ class OpenItem(CollmexRecord):
             paid=parse_collmex_decimal(get(18)),
             open_amount=parse_collmex_decimal(get(19)),
         )
-
-
-# =============================================================================
-# Accounting Document (Buchung) - ACCDOC
-# =============================================================================
 
 
 class AccountingDocument(CollmexRecord):
@@ -724,11 +694,6 @@ class AccountingDocument(CollmexRecord):
         )
 
 
-# =============================================================================
-# Account Balance (Kontosaldo) - ACC_BAL
-# =============================================================================
-
-
 class AccountBalance(CollmexRecord):
     """Collmex account balance record (ACC_BAL).
 
@@ -769,11 +734,6 @@ class AccountBalance(CollmexRecord):
             self.account_name,
             format_collmex_decimal(self.balance),
         ]
-
-
-# =============================================================================
-# Invoice Payment (Rechnungszahlung) - INVOICE_PAYMENT
-# =============================================================================
 
 
 class InvoicePayment(CollmexRecord):
@@ -843,9 +803,6 @@ class InvoicePayment(CollmexRecord):
             system_name=get(8),
         )
 
-# =============================================================================
-# Record type mapping
-# =============================================================================
 
 RECORD_TYPES: dict[str, type[CollmexRecord]] = {
     "CMXLIF": Vendor,
@@ -876,11 +833,6 @@ def parse_record(row: list[str]) -> CollmexRecord | None:
         return None
 
     return model_class.from_csv_row(row)
-
-
-# =============================================================================
-# Invoice (Kundenrechnung) - CMXINV
-# =============================================================================
 
 
 class InvoiceLine(BaseModel):

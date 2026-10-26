@@ -95,11 +95,6 @@ def handle_error(e: Exception) -> None:
     raise typer.Exit(1)
 
 
-# =============================================================================
-# Vendors Commands
-# =============================================================================
-
-
 @app.command("vendors")
 def list_vendors(
     vendor_id: Annotated[int | None, typer.Option("--id", help="Filter by vendor ID")] = None,
@@ -226,7 +221,6 @@ def update_vendor(
     Fetches current vendor data, applies the specified field updates, and saves
     back to Collmex. Warns if a previously filled field is being overwritten.
     """
-    # Collect only the fields that were provided
     updates: dict = {}
     if name is not None:
         updates["company_name"] = name
@@ -257,11 +251,9 @@ def update_vendor(
 
     try:
         with CollmexClient() as client:
-            # Fetch current vendor to detect overwrites
             existing = client.get_vendors(vendor_id=vendor_id)
             if existing:
                 current = existing[0]
-                # Warn when overwriting non-empty critical fields
                 for field in ("company_name", "street", "postal_code", "city", "country"):
                     if field in updates:
                         current_val = getattr(current, field, "")
@@ -283,11 +275,6 @@ def update_vendor(
             console.print(f"City: {updated.city}")
     except Exception as e:  # noqa: BLE001 - CLI boundary converts failures to exit status 1.
         handle_error(e)
-
-
-# =============================================================================
-# Customer Commands
-# =============================================================================
 
 
 @app.command("customers")
@@ -360,11 +347,6 @@ def create_customer(
         handle_error(e)
 
 
-# =============================================================================
-# Open Items Commands
-# =============================================================================
-
-
 @app.command("open-items")
 def list_open_items(
     vendor: Annotated[bool, typer.Option("--vendor", "-v", help="Show vendor open items")] = False,
@@ -376,7 +358,6 @@ def list_open_items(
     """List open items (offene Posten) - unpaid invoices."""
     try:
         with CollmexClient() as client:
-            # Default to vendor if --vendor flag is set
             is_vendor = vendor or not customer
             items = client.get_open_items(
                 vendor=is_vendor, vendor_id=vendor_id, customer_id=customer_id
@@ -406,11 +387,6 @@ def list_open_items(
             console.print(f"\n[dim]Total: {len(items)} items, {total} EUR open[/dim]")
     except Exception as e:  # noqa: BLE001 - CLI boundary converts failures to exit status 1.
         handle_error(e)
-
-
-# =============================================================================
-# Bookings Commands
-# =============================================================================
 
 
 @app.command("bookings")
@@ -464,11 +440,6 @@ def list_bookings(
         handle_error(e)
 
 
-# =============================================================================
-# Invoices Commands
-# =============================================================================
-
-
 @app.command("invoices")
 def list_invoices(
     invoice_id: Annotated[int | None, typer.Option("--invoice-id", help="Filter by invoice ID")] = None,
@@ -512,11 +483,6 @@ def list_invoices(
             console.print(f"\n[dim]Total: {len(invoices)} invoices[/dim]")
     except Exception as e:  # noqa: BLE001 - CLI boundary converts failures to exit status 1.
         handle_error(e)
-
-
-# =============================================================================
-# Account Balances Commands
-# =============================================================================
 
 
 @app.command("balances")
@@ -572,11 +538,6 @@ def list_balances(
             console.print(f"\n[dim]Total: {len(balances)} accounts[/dim]")
     except Exception as e:  # noqa: BLE001 - CLI boundary converts failures to exit status 1.
         handle_error(e)
-
-
-# =============================================================================
-# Invoice Payments Commands
-# =============================================================================
 
 
 @app.command("invoice-payments")
@@ -642,7 +603,6 @@ def bank_status(
     try:
         cfg = load_config()
 
-        # Single account or all configured accounts
         if account is not None:
             accounts = {"Account": account}
         elif cfg.bank_accounts:
@@ -680,7 +640,6 @@ def bank_status(
                 table.add_row(r["name"], str(r["account"]), last, str(r["booking_count"]))
             console.print(table)
 
-            # Show the overall earliest "last_date" as suggested MoneyMoney export start
             dates = [r["last_date"] for r in results if r["last_date"]]
             if dates:
                 earliest = min(dates)
@@ -738,11 +697,6 @@ def list_unmatched(
         handle_error(e)
 
 
-# =============================================================================
-# Customer Invoice Commands
-# =============================================================================
-
-
 @app.command("customer-invoice")
 def create_customer_invoice(
     customer_id: Annotated[int, typer.Option("--customer-id", "-c", help="Customer ID")],
@@ -798,11 +752,6 @@ def create_customer_invoice(
         handle_error(e)
 
 
-# =============================================================================
-# Vendor Invoice Commands
-# =============================================================================
-
-
 @app.command("vendor-invoice")
 def create_vendor_invoice(
     vendor_id: Annotated[int, typer.Option("--vendor-id", "-v", help="Vendor ID")],
@@ -854,11 +803,6 @@ def create_vendor_invoice(
         handle_error(e)
 
 
-# =============================================================================
-# ZUGFeRD Commands
-# =============================================================================
-
-
 @app.command("invoice-send")
 def send_invoice(
     pdf: Annotated[str, typer.Argument(help="Path to PDF file to send")],
@@ -881,7 +825,6 @@ def send_invoice(
     from .email import send_invoice_email
 
     try:
-        # Read XML content if provided
         xml_content = None
         if xml:
             xml_path = Path(xml)
@@ -938,7 +881,6 @@ def create_zugferd(
         inv_date = date.fromisoformat(invoice_date)
         payment_due = date.fromisoformat(due_date) if due_date else None
 
-        # Fetch vendor from Collmex
         with CollmexClient() as client:
             vendors = client.get_vendors(vendor_id=vendor_id)
 
@@ -948,7 +890,6 @@ def create_zugferd(
 
         vendor = vendors[0]
 
-        # Validate seller data unless --force is set
         if not force:
             missing = validate_vendor_for_zugferd(vendor)
             if missing:
@@ -959,7 +900,6 @@ def create_zugferd(
                 err_console.print("[dim]Use --force to skip validation.[/dim]")
                 raise typer.Exit(1)
 
-        # Create line items
         line_items = [
             {
                 "description": description,
@@ -970,7 +910,6 @@ def create_zugferd(
             }
         ]
 
-        # Generate XML
         xml_content = create_zugferd_xml(
             vendor=vendor,
             invoice_number=invoice_number,
@@ -981,7 +920,6 @@ def create_zugferd(
             notes=notes,
         )
 
-        # Output
         if output:
             save_zugferd_xml(xml_content, output)
             console.print(f"[green]ZUGFeRD XML saved to {output}[/green]")
@@ -1134,11 +1072,6 @@ def _parse_customer_zugferd_items(items_json: str) -> list[dict[str, Decimal | s
     return line_items
 
 
-# =============================================================================
-# Web Automation Commands
-# =============================================================================
-
-
 @app.command("upload-statement")
 def upload_statement(
     file: Annotated[str, typer.Argument(help="Path to MT940/CAMT bank statement file")],
@@ -1220,9 +1153,7 @@ def import_statements(
             err_console.print('[dim]"Fyrst Base" = "Fyrst (1200)"[/dim]')
             raise typer.Exit(1)
 
-        # Determine which accounts to process
         if account:
-            # Find MM account(s) mapping to this config account
             mm_pairs = [
                 (mm, cfg_name)
                 for mm, cfg_name in cfg.mm_accounts.items()
@@ -1240,7 +1171,6 @@ def import_statements(
         else:
             mm_pairs = list(cfg.mm_accounts.items())
 
-        # Get last booking dates for start date determination
         last_dates: dict[str, date | None] = {}
         if not date_from:
             with CollmexClient() as client:
@@ -1256,7 +1186,6 @@ def import_statements(
             for mm_name, cfg_name in mm_pairs:
                 console.print(f"\n[bold]{cfg_name}[/bold] (MoneyMoney: {mm_name})")
 
-                # Determine export start date
                 if date_from:
                     start = date_from
                 elif last_dates.get(cfg_name):
@@ -1270,7 +1199,6 @@ def import_statements(
 
                 console.print(f"  Exporting from {start}...")
 
-                # Export from MoneyMoney via mm CLI
                 with tempfile.NamedTemporaryFile(suffix=".sta", delete=False) as tmp:
                     tmp_path = Path(tmp.name)
 
@@ -1299,7 +1227,6 @@ def import_statements(
                         )
                         continue
 
-                    # Check if file has content
                     if not tmp_path.exists() or tmp_path.stat().st_size == 0:
                         console.print("  [dim]No new transactions to export.[/dim]")
                         continue
@@ -1308,7 +1235,6 @@ def import_statements(
                         f"  Uploading {tmp_path.name} ({tmp_path.stat().st_size} bytes)..."
                     )
 
-                    # Upload to Collmex
                     upload_result = web.upload_statement(tmp_path, cfg_name)
                     console.print(f"  [green]{upload_result['message']}[/green]")
                     results.append(upload_result)
@@ -1366,7 +1292,6 @@ def pending_bookings(
                 console.print("[dim]No pending bookings found.[/dim]")
                 return
 
-            # Use keys from first row as columns
             columns = list(bookings[0].keys())
             rows = [[b.get(c, "") for c in columns] for b in bookings]
             output_table(f"Pending Bookings ({account_name})", columns, rows)
@@ -1399,7 +1324,6 @@ def bank_statements(
     """
     from .web import CollmexWeb, CollmexWebError, PlaywrightCliError
 
-    # Map CLI status names to Collmex German filter values
     STATUS_TO_COLLMEX = {
         "pending": "Zu buchen",
         "deferred": "Später buchen",
@@ -1447,14 +1371,12 @@ def bank_statements(
 
             columns = ["date", "amount", "status", "booking_nr", "name", "purpose"]
             rows = [[s.get(c, "") for c in columns] for s in all_statements]
-            # Show account in title if single, add column if multiple
             if len(accounts) > 1:
                 columns.insert(0, "account")
                 rows = [[s.get("account", "")] + r for s, r in zip(all_statements, rows)]
             title = f"Bank Statements ({accounts[0]})" if len(accounts) == 1 else "Bank Statements (all accounts)"
             output_table(title, columns, rows)
 
-            # Summary by status
             from collections import Counter
             counts = Counter(s["status"] for s in all_statements)
             parts = [f"{v} {k}" for k, v in sorted(counts.items())]
@@ -1466,17 +1388,11 @@ def bank_statements(
         handle_error(e)
 
 
-# =============================================================================
-# Utility Commands
-# =============================================================================
-
-
 @app.command("test")
 def test_connection() -> None:
     """Test the Collmex API connection."""
     try:
         with CollmexClient() as client:
-            # Try to fetch vendors as a simple test
             vendors = client.get_vendors()
         console.print("[green]Connection successful![/green]")
         console.print(f"Found {len(vendors)} vendors in your account.")

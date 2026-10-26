@@ -141,11 +141,9 @@ class CollmexAPI:
             CollmexError: If the API returns an error
             CollmexAuthError: If authentication fails
         """
-        # Prepend login row
         all_rows = [self._build_login_row(), *rows]
         payload = self._encode_csv(all_rows)
 
-        # Send as raw POST with text/csv content type
         response = self.client.post(
             self.config.api_url,
             content=payload,
@@ -153,10 +151,8 @@ class CollmexAPI:
         )
         response.raise_for_status()
 
-        # Parse response
         result_rows = self._decode_csv(response.content)
 
-        # Check for errors
         self._check_errors(result_rows)
 
         return result_rows
@@ -183,7 +179,6 @@ class CollmexAPI:
                 msg_text = row[3] if len(row) > 3 else "Unknown error"
 
                 if msg_type == "E":
-                    # Check for auth errors
                     if msg_code in ("101001", "101002", "101003"):
                         raise CollmexAuthError(msg_text, msg_code)
                     raise CollmexError(msg_text, msg_code)
@@ -198,7 +193,6 @@ class CollmexAPI:
         Returns:
             List of result rows (excluding MESSAGE rows)
         """
-        # Build query row - first field is always the record type
         row = [record_type]
 
         # Add parameters in order (Collmex uses positional CSV fields)
@@ -213,5 +207,4 @@ class CollmexAPI:
 
         result = self.request(row)
 
-        # Filter out MESSAGE rows
         return [r for r in result if r and r[0] != "MESSAGE"]

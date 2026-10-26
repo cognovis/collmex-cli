@@ -682,13 +682,11 @@ def create_zugferd_xml(
     doc.header.type_code = "380"  # Commercial invoice
     doc.header.issue_date_time = invoice_date
 
-    # Add notes if provided
     if notes:
         note = IncludedNote()
         note.content = notes
         doc.header.notes.add(note)
 
-    # Seller (Vendor) party
     doc.trade.agreement.seller.name = vendor.company_name or f"{vendor.first_name} {vendor.last_name}".strip()
 
     if vendor.street:
@@ -707,7 +705,6 @@ def create_zugferd_xml(
         tax_reg.id = ("VA", vendor.vat_id)
         doc.trade.agreement.seller.tax_registrations.add(tax_reg)
 
-    # Buyer (your company) party
     doc.trade.agreement.buyer.name = config.buyer_name
 
     if buyer_customer_id:
@@ -729,7 +726,6 @@ def create_zugferd_xml(
         buyer_tax_reg.id = ("VA", config.buyer_vat_id)
         doc.trade.agreement.buyer.tax_registrations.add(buyer_tax_reg)
 
-    # Line items
     total_net = Decimal("0.00")
     tax_amounts: dict[str, tuple[Decimal, Decimal]] = {}  # rate -> (basis, tax)
 
@@ -758,7 +754,6 @@ def create_zugferd_xml(
 
         total_net += line_total
 
-        # Accumulate tax by rate
         rate_key = str(tax_rate)
         tax_amount = line_total * tax_rate / Decimal(100)
         if rate_key in tax_amounts:
@@ -769,10 +764,8 @@ def create_zugferd_xml(
 
         doc.trade.items.add(line)
 
-    # Settlement
     doc.trade.settlement.currency_code = "EUR"
 
-    # Payment means - bank transfer
     if vendor.iban:
         pm = PaymentMeans()
         pm.type_code = "58"  # SEPA credit transfer
@@ -781,7 +774,6 @@ def create_zugferd_xml(
             pm.payee_institution.bic = vendor.bic
         doc.trade.settlement.payment_means.add(pm)
 
-    # Payment terms
     if payment_terms_text or due_date:
         terms = PaymentTerms()
         if payment_terms_text:
@@ -790,7 +782,6 @@ def create_zugferd_xml(
             terms.due = due_date
         doc.trade.settlement.terms.add(terms)
 
-    # Tax breakdown
     total_tax = Decimal("0.00")
     for rate_str, (basis, tax) in tax_amounts.items():
         trade_tax = ApplicableTradeTax()
@@ -802,7 +793,6 @@ def create_zugferd_xml(
         doc.trade.settlement.trade_tax.add(trade_tax)
         total_tax += tax
 
-    # Monetary summation
     doc.trade.settlement.monetary_summation.line_total = total_net
     doc.trade.settlement.monetary_summation.charge_total = Decimal("0.00")
     doc.trade.settlement.monetary_summation.allowance_total = Decimal("0.00")
@@ -812,7 +802,6 @@ def create_zugferd_xml(
     doc.trade.settlement.monetary_summation.prepaid_total = Decimal("0.00")
     doc.trade.settlement.monetary_summation.due_amount = total_net + total_tax
 
-    # Generate XML
     return doc.serialize(schema="FACTUR-X_EN16931")
 
 
