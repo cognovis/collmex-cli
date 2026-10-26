@@ -13,10 +13,6 @@ from collmex_cli.models import Invoice, InvoiceLine
 runner = CliRunner()
 
 
-# =============================================================================
-# Helpers
-# =============================================================================
-
 def _make_header_row(
     invoice_id: int = 1001,
     customer_id: int = 42,
@@ -83,11 +79,6 @@ def _make_line_row(
     row[51] = total_vat
     row[52] = total_gross
     return row
-
-
-# =============================================================================
-# Model tests
-# =============================================================================
 
 
 class TestInvoiceModel:
@@ -166,11 +157,6 @@ class TestInvoiceModel:
     def test_empty_rows(self):
         """Empty input returns empty list."""
         assert Invoice.from_cmxinv_rows([]) == []
-
-
-# =============================================================================
-# Client method tests
-# =============================================================================
 
 
 class TestGetInvoices:
@@ -275,11 +261,6 @@ class TestGetInvoices:
         assert sent_row[3] == ""  # customer_id
         assert sent_row[4] == ""  # date_from
         assert sent_row[5] == ""  # date_to
-
-
-# =============================================================================
-# CLI tests
-# =============================================================================
 
 
 class TestInvoicesCli:

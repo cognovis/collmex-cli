@@ -12,11 +12,6 @@ from collmex_cli.models import AccountBalance
 runner = CliRunner()
 
 
-# =============================================================================
-# Model tests
-# =============================================================================
-
-
 class TestAccountBalanceModel:
     """Tests for AccountBalance.from_csv_row() parsing.
 
@@ -66,10 +61,6 @@ class TestAccountBalanceModel:
         assert bal.account_number == 1200
         assert bal.account_name == ""
         assert bal.balance is None
-
-# =============================================================================
-# Client method tests
-# =============================================================================
 
 
 class TestAccbalGet:
@@ -151,11 +142,6 @@ class TestAccbalGet:
         assert balances == []
 
 
-# =============================================================================
-# Filter tests
-# =============================================================================
-
-
 class TestBalanceFilters:
     """Tests for filtering by account number and fiscal year."""
 
@@ -208,11 +194,6 @@ class TestBalanceFilters:
         assert "3200" in call_args
         assert len(balances) == 1
         assert balances[0].account_number == 3200
-
-
-# =============================================================================
-# CLI command tests
-# =============================================================================
 
 
 class TestBalancesCli:

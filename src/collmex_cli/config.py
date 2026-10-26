@@ -49,23 +49,14 @@ class CollmexConfig(BaseSettings):
         extra="ignore",
     )
 
-    # ==========================================================================
-    # Collmex API credentials (required for CSV API commands)
-    # ==========================================================================
     customer_id: str = Field(description="Collmex customer ID")
     company_id: int = Field(default=1, description="Collmex company ID")
     username: str = Field(default="", description="Collmex API username")
     password: str = Field(default="", description="Collmex API password")
 
-    # ==========================================================================
-    # Collmex Web credentials (for upload-statement, pending-bookings)
-    # ==========================================================================
     web_username: str = Field(default="", description="Collmex web login username")
     web_password: str = Field(default="", description="Collmex web login password")
 
-    # ==========================================================================
-    # SMTP configuration (optional, for invoice-send)
-    # ==========================================================================
     smtp_host: str | None = Field(default=None, description="SMTP server hostname")
     smtp_port: int = Field(default=587, description="SMTP server port")
     smtp_user: str | None = Field(default=None, description="SMTP username")
@@ -76,9 +67,6 @@ class CollmexConfig(BaseSettings):
         default=None, description="Recipient email for invoices (buchhaltung@...)"
     )
 
-    # ==========================================================================
-    # Buyer information (optional, for ZUGFeRD XML generation)
-    # ==========================================================================
     buyer_name: str | None = Field(default=None, description="Your company name")
     buyer_street: str | None = Field(default=None, description="Your street address")
     buyer_zip: str | None = Field(default=None, description="Your postal code")
@@ -87,9 +75,6 @@ class CollmexConfig(BaseSettings):
     buyer_vat_id: str | None = Field(default=None, description="Your VAT ID (USt-IdNr)")
     buyer_email: str | None = Field(default=None, description="Your contact email")
 
-    # ==========================================================================
-    # Seller information (optional, for customer invoice rendering)
-    # ==========================================================================
     seller_name: str | None = Field(default=None, description="Seller company name")
     seller_street: str | None = Field(default=None, description="Seller street address")
     seller_zip: str | None = Field(default=None, description="Seller postal code")

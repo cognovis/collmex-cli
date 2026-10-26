@@ -41,11 +41,6 @@ from collmex_cli.models import InvoicePayment
 runner = CliRunner()
 
 
-# =============================================================================
-# Helpers
-# =============================================================================
-
-
 def _make_payment_row(
     invoice_number: str = "RE-2026-001",
     payment_date: str = "20260115",
@@ -85,11 +80,6 @@ def _make_payment(**kwargs) -> InvoicePayment:
     }
     defaults.update(kwargs)
     return InvoicePayment(**defaults)
-
-
-# =============================================================================
-# TestInvoicePaymentModel
-# =============================================================================
 
 
 class TestInvoicePaymentModel:
@@ -158,11 +148,6 @@ class TestInvoicePaymentModel:
         assert payment.payment_amount is None
         assert payment.booking_id is None
         assert payment.booking_position is None
-
-
-# =============================================================================
-# TestGetInvoicePayments
-# =============================================================================
 
 
 class TestGetInvoicePayments:
@@ -253,11 +238,6 @@ class TestGetInvoicePayments:
 
         payments = client.get_invoice_payments()
         assert len(payments) == 1
-
-
-# =============================================================================
-# TestInvoicePaymentsFilters
-# =============================================================================
 
 
 class TestInvoicePaymentsFilters:
@@ -351,11 +331,6 @@ class TestInvoicePaymentsFilters:
 
         row = mock_api.request.call_args[0][0]
         assert row[3] == ""
-
-
-# =============================================================================
-# TestInvoicePaymentsCLI
-# =============================================================================
 
 
 class TestInvoicePaymentsCLI:

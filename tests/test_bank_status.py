@@ -28,11 +28,6 @@ def _make_booking(doc_date: str, amount: str = "100.00") -> AccountingDocument:
     )
 
 
-# =============================================================================
-# AppConfig / XDG tests
-# =============================================================================
-
-
 class TestAppConfig:
     """Tests for XDG config loading."""
 
@@ -55,11 +50,6 @@ class TestAppConfig:
         monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
         from collmex_cli.app_config import config_path
         assert config_path() == tmp_path / "collmex-cli" / "config.toml"
-
-
-# =============================================================================
-# Client method tests
-# =============================================================================
 
 
 class TestGetLastBankBookingDate:
@@ -108,11 +98,6 @@ class TestGetLastBankBookingDate:
 
         assert result["last_date"] is None
         assert result["booking_count"] == 0
-
-
-# =============================================================================
-# CLI command tests
-# =============================================================================
 
 
 class TestBankStatusCommand:

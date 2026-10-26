@@ -65,11 +65,6 @@ SAMPLE_SNAPSHOT_LOGGED_IN = """\
 """
 
 
-# =============================================================================
-# Snapshot parsing tests
-# =============================================================================
-
-
 class TestSnapshotParsing:
     """Tests for snapshot parsing helper functions."""
 
@@ -125,11 +120,6 @@ class TestSnapshotParsing:
   - columnheader "C" [ref=h3]
 """
         assert _parse_snapshot_table(snapshot) == []
-
-
-# =============================================================================
-# CollmexWeb class tests
-# =============================================================================
 
 
 class TestCollmexWeb:
@@ -404,11 +394,6 @@ class TestCollmexWeb:
         web.close()  # Should not raise
 
 
-# =============================================================================
-# CLI command tests
-# =============================================================================
-
-
 class TestUploadStatementCommand:
     """Tests for the upload-statement CLI command."""
 
@@ -500,11 +485,6 @@ class TestPendingBookingsCommand:
         assert "No account" in result.output
 
 
-# =============================================================================
-# AppConfig web mapping tests
-# =============================================================================
-
-
 class TestAppConfigWeb:
     """Tests for bank_accounts_web in AppConfig."""
 
@@ -541,11 +521,6 @@ class TestAppConfigWeb:
             from collmex_cli.app_config import load_config
             cfg = load_config()
         assert cfg.mm_accounts == {"Fyrst Base": "Fyrst (1200)"}
-
-
-# =============================================================================
-# get_statements / bank-statements tests
-# =============================================================================
 
 
 class TestGetStatements:
@@ -637,11 +612,6 @@ class TestBankStatementsCommand:
         assert "No account" in result.output
 
 
-# =============================================================================
-# Additional snapshot helper tests
-# =============================================================================
-
-
 class TestFindRefForCombobox:
     """Tests for _find_ref_for_combobox helper."""
 
@@ -653,11 +623,6 @@ class TestFindRefForCombobox:
     def test_find_combobox_not_found(self):
         snapshot = '- combobox "Bankkonto:" [ref=e62]'
         assert _find_ref_for_combobox(snapshot, "Nope") is None
-
-
-# =============================================================================
-# Import Statements CLI tests
-# =============================================================================
 
 
 class TestImportStatementsCommand:
