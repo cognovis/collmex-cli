@@ -24,5 +24,5 @@ library sync --harness <harness>
 
 An explicit catalog file can be supplied with `library --catalog <file>`.
 `use` establishes the requested entry and `sync` maintains its copy and receipt.
-Edit the authored source rather than an installed `.agents/skills/` copy. A source
+Edit the authored source rather than an installed copy. A source
 commit does not establish publication, live catalog registration or propagation.

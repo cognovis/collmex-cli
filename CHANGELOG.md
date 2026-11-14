@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+### Changed
+
+- **No Library copies in the repository**: the skills, agents and standards Library's per-repository sync committed under `.agents/`, `.claude/skills`, `.claude/agents` and `.codex/agents` are removed; they now come from the `cognovis` plugin. The toolchain version check that CI and the pre-push preflight run moved into the repository as `scripts/ci/check_toolchain_versions.py`, with its tests in `tests/`. (cognovis/collmex-cli#24)
+
 ## [2026.10.0] - 2026-10-05
 
 ### Fixed

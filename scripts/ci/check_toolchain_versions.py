@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Check that a repository builds with the latest released toolchains.
 
-Rules (see the ``toolchains`` standard):
+Rules:
 
 1. Bun: the latest release.
 2. Node: reported as a Bun migration candidate, never failed.
@@ -1958,7 +1958,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     elif outdated or broken:
         status, code = "failed", 1
         summary = f"{outdated} outdated and {broken} unreadable toolchain declaration(s)"
-        next_steps.append("Move each outdated declaration to its latest release (see the toolchains standard).")
+        next_steps.append("Move each outdated declaration to its latest release.")
     else:
         status, code = "ok", 0
         summary = f"{len(declarations)} toolchain declaration(s) checked, none outdated"

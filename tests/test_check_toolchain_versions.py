@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "check_toolchain_versions.py"
+SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "ci" / "check_toolchain_versions.py"
 
 NPM_URL = "https://registry.npmjs.org/bun/latest"
 GITHUB_URL = "https://api.github.com/repos/oven-sh/bun/releases/latest"
@@ -774,7 +774,6 @@ def test_stateful_override_skips_the_lookup(checker, monkeypatch, capsys, tmp_pa
 # Review repairs (library-core#239 review round 2)
 # --------------------------------------------------------------------------
 
-STANDARD = Path(__file__).resolve().parents[1]
 LATEST_OVERRIDES = (
     "--latest-version", "bun=1.4.2",
     "--latest-version", "uv=0.12.23",
@@ -790,16 +789,6 @@ def entries(envelope: dict) -> list[tuple[str, str, str | None]]:
     return [(d["kind"], d["status"], d.get("reason")) for d in envelope["data"]["declarations"]]
 
 
-def test_f1_standard_reports_an_omitted_setup_version_as_implicit():
-    bun = (STANDARD / "bun.md").read_text(encoding="utf-8")
-    python = (STANDARD / "python.md").read_text(encoding="utf-8")
-    check = (STANDARD / "check.md").read_text(encoding="utf-8")
-    assert "is not allowed either" not in bun
-    setup_bun_row = next(line for line in bun.splitlines() if line.startswith("| CI `setup-bun`"))
-    assert "`implicit`" in setup_bun_row
-    setup_python_row = next(line for line in python.splitlines() if line.startswith("| CI `setup-python`"))
-    assert "check-latest: true" in setup_python_row and "`implicit`" in setup_python_row
-    assert "rollout" in check
 
 
 @pytest.mark.parametrize(

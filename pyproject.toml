@@ -62,4 +62,4 @@ addopts = "--import-mode=importlib -n auto"
 [tool.ruff]
 target-version = "py314"
 line-length = 120
-extend-exclude = [".agents", ".claude"]
+extend-exclude = [".claude", "scripts/ci/check_toolchain_versions.py", "tests/test_check_toolchain_versions.py"]
