@@ -11,11 +11,6 @@ from collmex_cli.models import Customer
 runner = CliRunner()
 
 
-# =============================================================================
-# Model tests
-# =============================================================================
-
-
 class TestCustomerModel:
     """Tests for the Customer Pydantic model."""
 
@@ -129,11 +124,6 @@ class TestCustomerModel:
         assert customer.customer_id == 5
         assert customer.first_name == ""
         assert customer.city == ""
-
-
-# =============================================================================
-# Client method tests
-# =============================================================================
 
 
 class TestGetCustomers:
@@ -271,11 +261,6 @@ class TestCreateCustomer:
         assert call_args[0] == "CMXKND"
         assert "Peter" in call_args
         assert "Pan GmbH" in call_args
-
-
-# =============================================================================
-# CLI command tests
-# =============================================================================
 
 
 class TestCustomersCommand:

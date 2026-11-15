@@ -135,7 +135,6 @@ def _parse_snapshot_table(snapshot: str) -> list[dict[str, str]]:
                 if is_columnheader:
                     current_row_has_columnheader = True
 
-    # Last row
     if in_row and current_cells:
         _save_row()
 
@@ -249,7 +248,6 @@ class CollmexWeb:
 
         self._login()
 
-        # Verify login succeeded
         snapshot = self._snapshot()
         if 'link "Abmelden"' not in snapshot:
             raise CollmexWebError("Login failed — check web_username/web_password in config.toml")
@@ -300,7 +298,6 @@ class CollmexWeb:
         self._navigate_to_import()
         snapshot = self._snapshot()
 
-        # Select bank account from dropdown
         web_name = self._resolve_account_web_name(account_name)
         select_ref = _find_ref_for_combobox(snapshot, "Bankkonto:")
         if select_ref:
@@ -309,7 +306,6 @@ class CollmexWeb:
         # Fresh snapshot after select (refs change)
         snapshot = self._snapshot()
 
-        # Click the file input button, then upload
         file_ref = (
             _find_ref_for_button(snapshot, "Choose File")
             or _find_ref_for_button(snapshot, "Datei auswählen")
@@ -322,7 +318,6 @@ class CollmexWeb:
         # Fresh snapshot after upload (refs change)
         snapshot = self._snapshot()
 
-        # Click import button
         submit_ref = _find_ref_by_text(snapshot, "Importieren")
         if not submit_ref:
             submit_ref = _find_ref_by_text(snapshot, "Import")
@@ -330,7 +325,6 @@ class CollmexWeb:
             raise CollmexWebError("Import button not found — cannot submit upload form")
         self._pcli("click", submit_ref)
 
-        # Check result
         snapshot = self._snapshot()
         if "Fehler" in snapshot or "Error" in snapshot:
             error_msg = _extract_message(snapshot, "Fehler")
@@ -365,25 +359,21 @@ class CollmexWeb:
         self._navigate_to_statement_view()
         snapshot = self._snapshot()
 
-        # Select bank account
         web_name = self._resolve_account_web_name(account_name)
         account_ref = _find_ref_for_combobox(snapshot, "Bankkonto:")
         if account_ref:
             self._select_option(account_ref, web_name)
 
-        # Select status "Zu buchen"
         status_ref = _find_ref_for_combobox(snapshot, "Status:")
         if status_ref:
             self._select_option(status_ref, "Zu buchen")
 
-        # Click search/display button
         submit_ref = _find_ref_by_text(snapshot, "Anzeigen")
         if not submit_ref:
             submit_ref = _find_ref_by_text(snapshot, "Suchen")
         if submit_ref:
             self._pcli("click", submit_ref)
 
-        # Parse results table
         snapshot = self._snapshot()
         return _parse_snapshot_table(snapshot)
 
@@ -413,25 +403,21 @@ class CollmexWeb:
         if account_ref:
             self._select_option(account_ref, web_name)
 
-        # Select status filter if provided
         if status:
             status_ref = _find_ref_for_combobox(snapshot, "Status:")
             if status_ref:
                 self._select_option(status_ref, status)
 
-        # Fill date field if provided
         if date_from:
             date_ref = _find_ref_for_textbox(snapshot, "Datum von:")
             if date_ref:
                 self._pcli("fill", date_ref, date_from)
 
-        # Click "Anzeigen" button
         snapshot = self._snapshot()
         submit_ref = _find_ref_for_button(snapshot, "Anzeigen")
         if submit_ref:
             self._pcli("click", submit_ref)
 
-        # Parse results
         snapshot = self._snapshot()
         return _parse_snapshot_table(snapshot)
 
@@ -507,11 +493,6 @@ class CollmexWeb:
             except PlaywrightCliError:
                 pass
             self._browser_opened = False
-
-
-# =============================================================================
-# Snapshot parsing helpers
-# =============================================================================
 
 
 def _extract_ref(line: str) -> str | None:

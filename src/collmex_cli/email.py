@@ -49,20 +49,17 @@ def send_invoice_email(
     if not pdf_path.exists():
         raise FileNotFoundError(f"PDF file not found: {pdf_path}")
 
-    # Create message
     msg = MIMEMultipart()
     msg["From"] = config.smtp_from
     msg["To"] = recipient
     msg["Subject"] = subject or f"Rechnung: {pdf_path.stem}"
 
-    # Body
     body_text = body or (
         f"Anbei die Rechnung {pdf_path.name} zur Verbuchung.\n\n"
         "Diese E-Mail wurde automatisch generiert."
     )
     msg.attach(MIMEText(body_text, "plain", "utf-8"))
 
-    # Attach PDF
     with open(pdf_path, "rb") as f:
         pdf_attachment = MIMEApplication(f.read(), _subtype="pdf")
         pdf_attachment.add_header(
@@ -70,19 +67,16 @@ def send_invoice_email(
         )
         msg.attach(pdf_attachment)
 
-    # Attach ZUGFeRD XML if provided
     if xml_content:
         xml_attachment = MIMEApplication(
             xml_content.encode("utf-8"), _subtype="xml"
         )
-        # Standard ZUGFeRD filename
         xml_filename = "factur-x.xml"
         xml_attachment.add_header(
             "Content-Disposition", "attachment", filename=xml_filename
         )
         msg.attach(xml_attachment)
 
-    # Send
     with smtplib.SMTP(config.smtp_host, config.smtp_port) as server:
         if config.smtp_use_tls:
             server.starttls()

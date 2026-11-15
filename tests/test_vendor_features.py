@@ -30,11 +30,6 @@ def make_vendor(**kwargs) -> Vendor:
     return Vendor(**defaults)
 
 
-# =============================================================================
-# Bead collmex-cli-rxc: vendor-match missing_fields
-# =============================================================================
-
-
 class TestVendorMissingFields:
     """Tests for _vendor_missing_fields() helper."""
 
@@ -155,11 +150,6 @@ class TestVendorMatchMissingFields:
         assert result["match"] in ("fuzzy", "exact")
         if result["match"] == "fuzzy":
             assert all("missing_fields" in c for c in result["candidates"])
-
-
-# =============================================================================
-# Bead collmex-cli-qqe: vendor-update
-# =============================================================================
 
 
 class TestUpdateVendor:
@@ -345,11 +335,6 @@ class TestVendorUpdateCommand:
         assert "country" in result.output or "Warning" in result.output
 
 
-# =============================================================================
-# Bead collmex-cli-c12.5: vendor invoice Buchungsnummer
-# =============================================================================
-
-
 class TestVendorInvoiceCommand:
     """Tests for vendor-invoice booking number output."""
 
@@ -371,11 +356,6 @@ class TestVendorInvoiceCommand:
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert data["buchungsnummer"] == 67890
-
-
-# =============================================================================
-# Bead collmex-cli-fjf: zugferd-create validation
-# =============================================================================
 
 
 class TestValidateVendorForZugferd:
@@ -503,11 +483,6 @@ class TestZugferdCreateValidation:
         # Should not exit with 1 due to validation
         assert result.exit_code == 0
         mock_xml.assert_called_once()
-
-
-# =============================================================================
-# Bead ez1: zugferd TaxRegistration schemeID correctness
-# =============================================================================
 
 
 class TestZugferdTaxRegistrationSchemeID:
