@@ -12,8 +12,10 @@ NonEmptyString = Annotated[str, StringConstraints(strip_whitespace=True, min_len
 CountryCode = Annotated[str, StringConstraints(strip_whitespace=True, to_upper=True, pattern=r"^[A-Z]{2}$")]
 CurrencyCode = Annotated[str, StringConstraints(strip_whitespace=True, to_upper=True, pattern=r"^[A-Z]{3}$")]
 Amount = Annotated[Decimal, Field(ge=Decimal("0.00"))]
-PositiveAmount = Annotated[Decimal, Field(gt=Decimal("0.00"))]
-TaxCategoryCode = Literal["S", "Z", "AE", "G"]
+TaxCategoryCode = Literal["S", "Z", "AE", "G", "O"]
+PaymentMeansTypeCode = Literal["10", "20", "30", "58"]
+_ZERO_RATE_CATEGORIES = frozenset({"Z", "AE", "G", "O"})
+_TRANSFER_PAYMENT_CODES = frozenset({"30", "58"})
 
 
 class InvoiceSnapshotError(ValueError):
@@ -46,11 +48,13 @@ class InvoiceLineSnapshot(BaseModel):
 
     object_id: int
     description: NonEmptyString
-    quantity: PositiveAmount
+    # EN 16931 forbids negative item net prices (BR-27); a negative line
+    # carries its sign in the quantity and the line total.
+    quantity: Decimal
     unit_code: NonEmptyString
     unit_price: Amount
     tax_rate: Amount
-    line_total: Amount
+    line_total: Decimal
     tax_category_code: TaxCategoryCode | None = None
 
     @property
@@ -67,8 +71,8 @@ class TaxSnapshot(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     rate: Amount
-    basis_amount: Amount
-    tax_amount: Amount
+    basis_amount: Decimal
+    tax_amount: Decimal
     category_code: TaxCategoryCode | None = None
 
     @property
@@ -109,7 +113,7 @@ class InvoiceSnapshot(BaseModel):
     totals: InvoiceTotalsSnapshot
     payment_terms: NonEmptyString
     due_date: date
-    payment_means_type_code: Literal["10", "20", "58"]
+    payment_means_type_code: PaymentMeansTypeCode
     payee_iban: NonEmptyString | None = None
     payee_bic: NonEmptyString | None = None
 
@@ -146,15 +150,16 @@ class InvoiceSnapshot(BaseModel):
             if not _valid_tax_category(tax.rate, category_code):
                 invalid_fields.append(f"taxes.{index}.category_code")
 
-        if declared_categories != set(basis_by_category):
+        categories = {category_code for _, category_code in set(basis_by_category) | declared_categories}
+        # BR-O-11 to BR-O-14: category O excludes every other VAT category.
+        if declared_categories != set(basis_by_category) or ("O" in categories and categories != {"O"}):
             invalid_fields.append("taxes")
         if self.seller.vat_id is None:
             invalid_fields.append("seller.vat_id")
-        if self.payment_means_type_code == "58":
-            if self.payee_iban is None:
-                invalid_fields.append("payee_iban")
-            if self.payee_bic is None:
-                invalid_fields.append("payee_bic")
+        if self.payment_means_type_code in _TRANSFER_PAYMENT_CODES and self.payee_iban is None:
+            invalid_fields.append("payee_iban")
+        if self.payment_means_type_code == "58" and self.payee_bic is None:
+            invalid_fields.append("payee_bic")
 
         line_total = _money(sum((line.line_total for line in self.lines), Decimal("0.00")))
         tax_total = _money(sum((tax.tax_amount for tax in self.taxes), Decimal("0.00")))
@@ -183,7 +188,7 @@ def _money(value: Decimal) -> Decimal:
 def _valid_tax_category(rate: Decimal, category_code: TaxCategoryCode) -> bool:
     normalized_rate = _money(rate)
     if normalized_rate == Decimal("0.00"):
-        return category_code in {"Z", "AE", "G"}
+        return category_code in _ZERO_RATE_CATEGORIES
     return category_code == "S"
 
 

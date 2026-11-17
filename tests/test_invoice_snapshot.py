@@ -14,6 +14,8 @@ from facturx import xml_check_schematron, xml_check_xsd
 from fastapi import Request
 from fastapi.testclient import TestClient
 from pypdf import PdfReader
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
 from starlette.middleware.base import RequestResponseEndpoint
 from starlette.responses import Response
@@ -46,14 +48,25 @@ def test_authentication_middleware_has_a_complete_public_signature() -> None:
     }
 
 
-def _visible_pdf() -> bytes:
+_EMBEDDED_FONT = "Vera"
+pdfmetrics.registerFont(TTFont(_EMBEDDED_FONT, "Vera.ttf"))
+
+
+def _visible_pdf(*, font: str = _EMBEDDED_FONT) -> bytes:
     output = BytesIO()
     document = canvas.Canvas(output, pagesize=(595, 842), invariant=1)
     for text in ("Existing invoice header", "Existing invoice detail page"):
+        document.setFont(font, 12)
         document.drawString(72, 770, text)
         document.showPage()
     document.save()
     return output.getvalue()
+
+
+def _vera_font_bytes() -> bytes:
+    import reportlab
+
+    return (Path(reportlab.__file__).parent / "fonts" / "Vera.ttf").read_bytes()
 
 
 def _snapshot(*, document_kind: str = "invoice") -> dict[str, object]:
@@ -217,6 +230,7 @@ def test_invoice_snapshot_generates_valid_coherent_document_pair() -> None:
 def test_openoffice_fractional_page_geometry_survives_embedding() -> None:
     """Insignificant PDF number serialization must not reject an unchanged OpenOffice page."""
     content = b"BT /F1 12 Tf 72 770 Td (Existing OpenOffice invoice) Tj ET"
+    font_program = _vera_font_bytes()
     objects = [
         b"<< /Type /Catalog /Pages 2 0 R >>",
         b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
@@ -227,7 +241,13 @@ def test_openoffice_fractional_page_geometry_survives_embedding() -> None:
             b"/Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>"
         ),
         b"<< /Length " + str(len(content)).encode() + b" >>\nstream\n" + content + b"\nendstream",
-        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+        b"<< /Type /Font /Subtype /TrueType /BaseFont /BitstreamVeraSans-Roman /FontDescriptor 6 0 R >>",
+        (
+            b"<< /Type /FontDescriptor /FontName /BitstreamVeraSans-Roman /Flags 32 "
+            b"/FontBBox [-183 -236 1287 928] /ItalicAngle 0 /Ascent 928 /Descent -236 "
+            b"/CapHeight 729 /StemV 87 /FontFile2 7 0 R >>"
+        ),
+        b"<< /Length " + str(len(font_program)).encode() + b" >>\nstream\n" + font_program + b"\nendstream",
     ]
     original = bytearray(b"%PDF-1.4\n")
     offsets = []
@@ -325,6 +345,152 @@ def test_transfer_payment_requires_iban_and_bic() -> None:
         validate_invoice_snapshot(payload)
 
     assert captured.value.fields == ["payee_bic", "payee_iban"]
+
+
+def _discount_line_snapshot(*, document_kind: str = "invoice") -> dict[str, object]:
+    snapshot = _snapshot(document_kind=document_kind)
+    snapshot["lines"] = [
+        {
+            "object_id": 84002,
+            "description": "Translation service",
+            "quantity": "1.00",
+            "unit_code": "HUR",
+            "unit_price": "100.00",
+            "tax_rate": "19.00",
+            "line_total": "100.00",
+            "tax_category_code": "S",
+        },
+        {
+            "object_id": 84003,
+            "description": "Discount",
+            "quantity": "-1.00",
+            "unit_code": "C62",
+            "unit_price": "20.00",
+            "tax_rate": "19.00",
+            "line_total": "-20.00",
+            "tax_category_code": "S",
+        },
+    ]
+    snapshot["taxes"] = [{"rate": "19.00", "basis_amount": "80.00", "tax_amount": "15.20", "category_code": "S"}]
+    snapshot["totals"] = {
+        "line_total": "80.00",
+        "tax_basis_total": "80.00",
+        "tax_total": "15.20",
+        "grand_total": "95.20",
+        "due_amount": "95.20",
+    }
+    return snapshot
+
+
+@pytest.mark.parametrize("document_kind", ["invoice", "credit_note"])
+def test_negative_line_carries_its_sign_in_the_quantity(document_kind: str) -> None:
+    """A discount line keeps a non-negative unit price (BR-27) and reduces the totals through its quantity."""
+    documents = generate_invoice_documents(
+        InvoiceSnapshot.model_validate(_discount_line_snapshot(document_kind=document_kind)),
+        _visible_pdf(),
+    )
+
+    assert b'<ram:BilledQuantity unitCode="C62">-1.00</ram:BilledQuantity>' in documents.xml
+    assert b"<ram:LineTotalAmount>-20.00</ram:LineTotalAmount>" in documents.xml
+    assert b"<ram:GrandTotalAmount>95.20</ram:GrandTotalAmount>" in documents.xml
+    assert xml_check_schematron(documents.xml, flavor="factur-x", level="en16931") is True
+
+
+def test_negative_unit_price_is_rejected() -> None:
+    """EN 16931 forbids negative item net prices, so the snapshot must carry the sign in the quantity."""
+    payload = _discount_line_snapshot()
+    payload["lines"][1] = {**payload["lines"][1], "quantity": "1.00", "unit_price": "-20.00"}
+
+    with pytest.raises(InvoiceSnapshotError) as captured:
+        validate_invoice_snapshot(payload)
+
+    assert captured.value.fields == ["lines.1.unit_price"]
+
+
+def test_not_subject_to_vat_follows_the_en16931_rules() -> None:
+    """Services outside the scope of German VAT carry category O without rate or VAT identifiers."""
+    documents = generate_invoice_documents(
+        InvoiceSnapshot.model_validate(_zero_rate_snapshot("O")),
+        _visible_pdf(),
+    )
+
+    assert b"<ram:CategoryCode>O</ram:CategoryCode>" in documents.xml
+    assert b"<ram:ExemptionReasonCode>VATEX-EU-O</ram:ExemptionReasonCode>" in documents.xml
+    assert b"RateApplicablePercent" not in documents.xml
+    assert b'schemeID="VA"' not in documents.xml
+    assert xml_check_schematron(documents.xml, flavor="factur-x", level="en16931") is True
+
+
+def test_not_subject_to_vat_cannot_mix_with_other_categories() -> None:
+    """BR-O-11 to BR-O-14: an invoice with category O has no other VAT category."""
+    payload = _zero_rate_snapshot("O")
+    payload["lines"].append(
+        {
+            "object_id": 84003,
+            "description": "Domestic service",
+            "quantity": "1.00",
+            "unit_code": "C62",
+            "unit_price": "100.00",
+            "tax_rate": "19.00",
+            "line_total": "100.00",
+            "tax_category_code": "S",
+        }
+    )
+    payload["taxes"].append({"rate": "19.00", "basis_amount": "100.00", "tax_amount": "19.00", "category_code": "S"})
+    payload["totals"] = {
+        "line_total": "300.00",
+        "tax_basis_total": "300.00",
+        "tax_total": "19.00",
+        "grand_total": "319.00",
+        "due_amount": "319.00",
+    }
+
+    with pytest.raises(InvoiceSnapshotError) as captured:
+        validate_invoice_snapshot(payload)
+
+    assert captured.value.fields == ["taxes"]
+
+
+def test_reverse_charge_carries_its_exemption_code() -> None:
+    """Reverse-charge breakdowns name the VATEX code next to the free-text reason."""
+    documents = generate_invoice_documents(
+        InvoiceSnapshot.model_validate(_zero_rate_snapshot("AE")),
+        _visible_pdf(),
+    )
+
+    assert b"<ram:ExemptionReasonCode>VATEX-EU-AE</ram:ExemptionReasonCode>" in documents.xml
+
+
+def test_credit_transfer_carries_the_payee_iban() -> None:
+    """A non-SEPA credit transfer (UNTDID 30) names the payee account (BR-61) without requiring a BIC."""
+    payload = _snapshot()
+    payload["payment_means_type_code"] = "30"
+    payload["payee_bic"] = None
+
+    documents = generate_invoice_documents(InvoiceSnapshot.model_validate(payload), _visible_pdf())
+
+    assert b"<ram:TypeCode>30</ram:TypeCode>" in documents.xml
+    assert b"<ram:IBANID>DE02120300000000202051</ram:IBANID>" in documents.xml
+    assert xml_check_schematron(documents.xml, flavor="factur-x", level="en16931") is True
+
+
+def test_credit_transfer_requires_the_payee_iban() -> None:
+    """BR-61: a credit transfer without the payee account fails closed."""
+    payload = _snapshot()
+    payload["payment_means_type_code"] = "30"
+    payload["payee_iban"] = None
+    payload["payee_bic"] = None
+
+    with pytest.raises(InvoiceSnapshotError) as captured:
+        validate_invoice_snapshot(payload)
+
+    assert captured.value.fields == ["payee_iban"]
+
+
+def test_visible_pdf_with_unembedded_font_is_rejected() -> None:
+    """PDF/A-3B requires embedded fonts; a rendering that relies on a viewer font fails closed."""
+    with pytest.raises(ValueError, match=r"^Invoice 84001 has invalid fields: pdfa3b$"):
+        generate_invoice_documents(InvoiceSnapshot.model_validate(_snapshot()), _visible_pdf(font="Helvetica"))
 
 
 def test_inconsistent_totals_fail_with_object_id_and_field_names_only() -> None:

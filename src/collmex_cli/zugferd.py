@@ -102,8 +102,20 @@ def _visible_page_signature(reader: PdfReader) -> list[tuple[tuple[float, ...], 
     return signatures
 
 
+# EN 16931 VAT exemption reason per zero-rate category: free text and VATEX code.
+_VAT_EXEMPTIONS = {
+    "AE": ("Reverse charge", "VATEX-EU-AE"),
+    "G": ("Export outside the EU", "VATEX-EU-G"),
+    "O": ("Not subject to VAT", "VATEX-EU-O"),
+}
+
+
 def _create_snapshot_xml(snapshot: InvoiceSnapshot) -> bytes:
     """Serialize one normalized outgoing invoice snapshot as EN 16931 CII."""
+    # BR-O-02 to BR-O-06: an invoice outside the scope of VAT names no VAT
+    # identifiers and no VAT rates. The snapshot model guarantees that
+    # category O never mixes with another category.
+    not_subject_to_vat = any(tax.effective_category_code == "O" for tax in snapshot.taxes)
     doc = Document()
     doc.context.guideline_parameter.id = "urn:cen.eu:en16931:2017"
     doc.header.id = snapshot.document_number
@@ -117,7 +129,7 @@ def _create_snapshot_xml(snapshot: InvoiceSnapshot) -> bytes:
     doc.trade.agreement.seller.address.postcode = snapshot.seller.postal_code
     doc.trade.agreement.seller.address.city_name = snapshot.seller.city
     doc.trade.agreement.seller.address.country_id = snapshot.seller.country_code
-    if snapshot.seller.vat_id:
+    if snapshot.seller.vat_id and not not_subject_to_vat:
         seller_tax_registration = TaxRegistration()
         seller_tax_registration.id = ("VA", snapshot.seller.vat_id)
         doc.trade.agreement.seller.tax_registrations.add(seller_tax_registration)
@@ -128,7 +140,7 @@ def _create_snapshot_xml(snapshot: InvoiceSnapshot) -> bytes:
     doc.trade.agreement.buyer.address.postcode = snapshot.buyer.postal_code
     doc.trade.agreement.buyer.address.city_name = snapshot.buyer.city
     doc.trade.agreement.buyer.address.country_id = snapshot.buyer.country_code
-    if snapshot.buyer.vat_id:
+    if snapshot.buyer.vat_id and not not_subject_to_vat:
         buyer_tax_registration = TaxRegistration()
         buyer_tax_registration.id = ("VA", snapshot.buyer.vat_id)
         doc.trade.agreement.buyer.tax_registrations.add(buyer_tax_registration)
@@ -142,16 +154,18 @@ def _create_snapshot_xml(snapshot: InvoiceSnapshot) -> bytes:
         line.delivery.billed_quantity = (item.quantity, item.unit_code)
         line.settlement.trade_tax.type_code = "VAT"
         line.settlement.trade_tax.category_code = item.effective_tax_category_code
-        line.settlement.trade_tax.rate_applicable_percent = item.tax_rate
+        if item.effective_tax_category_code != "O":
+            line.settlement.trade_tax.rate_applicable_percent = item.tax_rate
         line.settlement.monetary_summation.total_amount = item.line_total
         doc.trade.items.add(line)
 
     doc.trade.settlement.currency_code = snapshot.currency
     payment_means = PaymentMeans()
     payment_means.type_code = snapshot.payment_means_type_code
-    if snapshot.payment_means_type_code == "58":
+    if snapshot.payment_means_type_code in {"30", "58"}:
         payment_means.payee_account.iban = snapshot.payee_iban
-        payment_means.payee_institution.bic = snapshot.payee_bic
+        if snapshot.payee_bic:
+            payment_means.payee_institution.bic = snapshot.payee_bic
     doc.trade.settlement.payment_means.add(payment_means)
 
     payment_terms = PaymentTerms()
@@ -165,11 +179,10 @@ def _create_snapshot_xml(snapshot: InvoiceSnapshot) -> bytes:
         trade_tax.basis_amount = tax.basis_amount
         trade_tax.type_code = "VAT"
         trade_tax.category_code = tax.effective_category_code
-        trade_tax.rate_applicable_percent = tax.rate
-        if tax.effective_category_code == "AE":
-            trade_tax.exemption_reason = "Reverse charge"
-        elif tax.effective_category_code == "G":
-            trade_tax.exemption_reason = "Export outside the EU"
+        if tax.effective_category_code != "O":
+            trade_tax.rate_applicable_percent = tax.rate
+        if tax.effective_category_code in _VAT_EXEMPTIONS:
+            trade_tax.exemption_reason, trade_tax.exemption_reason_code = _VAT_EXEMPTIONS[tax.effective_category_code]
         doc.trade.settlement.trade_tax.add(trade_tax)
 
     totals = doc.trade.settlement.monetary_summation
@@ -185,7 +198,11 @@ def _create_snapshot_xml(snapshot: InvoiceSnapshot) -> bytes:
 
 
 def _validate_pdfa3b(object_id: int, pdf_content: bytes) -> None:
-    """Verify required PDF/A-3B metadata and the embedded-file relationship."""
+    """Verify PDF/A-3B metadata, the embedded-file relationship, and embedded fonts.
+
+    This is a fail-closed subset of PDF/A-3B. Full conformance is accepted
+    with veraPDF on real rendered invoices.
+    """
     import pikepdf
     from pikepdf import Name
 
@@ -196,10 +213,74 @@ def _validate_pdfa3b(object_id: int, pdf_content: bytes) -> None:
             output_intents = pdf.Root.get("/OutputIntents", [])
             embedded_names = pdf.Root["/Names"]["/EmbeddedFiles"]["/Names"]
             relationship_valid = embedded_names[1].get("/AFRelationship") == Name("/Alternative")
-            if not metadata_valid or not output_intents or not relationship_valid:
+            visited: set[tuple[int, int]] = set()
+            fonts_embedded = all(_fonts_embedded(page, page.obj.get("/Resources"), visited) for page in pdf.pages)
+            if not metadata_valid or not output_intents or not relationship_valid or not fonts_embedded:
                 raise ValueError
     except (KeyError, TypeError, ValueError, pikepdf.PdfError) as exc:
         raise ValueError(f"Invoice {object_id} has invalid fields: pdfa3b") from exc
+
+
+_FONT_PROGRAM_KEYS = ("/FontFile", "/FontFile2", "/FontFile3")
+
+
+def _fonts_embedded(content: object, resources: object, visited: set[tuple[int, int]]) -> bool:
+    """Return whether every font used for rendering carries its font program (PDF/A-3 6.2.11.4).
+
+    Args:
+        content: A page or form XObject whose content stream is inspected.
+        resources: The resource dictionary that names its fonts and XObjects.
+        visited: Indirect objects already inspected, to stop on shared or cyclic forms.
+    """
+    import pikepdf
+
+    if isinstance(content, pikepdf.Object) and content.is_indirect:
+        if content.objgen in visited:
+            return True
+        visited.add(content.objgen)
+    fonts = resources.get("/Font") if isinstance(resources, pikepdf.Dictionary) else None
+    xobjects = resources.get("/XObject") if isinstance(resources, pikepdf.Dictionary) else None
+    # The text font is part of the graphics state: a font only counts once
+    # text is shown with it, and q/Q save and restore the current font.
+    current_font: object = None
+    saved_fonts: list[object] = []
+    for operands, operator in pikepdf.parse_content_stream(content, "q Q Tf Tj TJ ' \" Do"):
+        match str(operator):
+            case "q":
+                saved_fonts.append(current_font)
+            case "Q":
+                current_font = saved_fonts.pop() if saved_fonts else None
+            case "Tf":
+                current_font = operands[0]
+            case "Tj" | "TJ" | "'" | '"':
+                font = fonts.get(current_font) if fonts is not None and current_font is not None else None
+                if font is None or not _font_program_embedded(font, visited):
+                    return False
+            case "Do":
+                xobject = xobjects.get(operands[0]) if xobjects is not None else None
+                if (
+                    xobject is not None
+                    and xobject.get("/Subtype") == pikepdf.Name("/Form")
+                    and not _fonts_embedded(xobject, xobject.get("/Resources", resources), visited)
+                ):
+                    return False
+    return True
+
+
+def _font_program_embedded(font: object, visited: set[tuple[int, int]]) -> bool:
+    import pikepdf
+
+    if font.get("/Subtype") == pikepdf.Name("/Type3"):
+        # Type 3 glyphs are content streams; check the fonts they draw with.
+        glyph_resources = font.get("/Resources")
+        return all(_fonts_embedded(glyph, glyph_resources, visited) for glyph in font.get("/CharProcs", {}).values())
+    descendants = font.get("/DescendantFonts")
+    described_fonts = list(descendants) if descendants is not None else [font]
+    for described in described_fonts:
+        descriptor = described.get("/FontDescriptor")
+        if descriptor is None or not any(key in descriptor for key in _FONT_PROGRAM_KEYS):
+            return False
+    return True
 
 
 # Compiled EN 16931 Schematron file names in the factur-x package, newest layout first.
